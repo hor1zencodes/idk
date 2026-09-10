@@ -378,7 +378,7 @@ end)
 -- ═══════════════════════════════════════════════════
 -- 5. SUB-TAB CAPSULE BAR (from forjnkie.lua createSubTabBar)
 -- ═══════════════════════════════════════════════════
-local tabNames = { "Reanims", "Favs", "Custom", "Binds", "States", "Speed", "Copier", "Tracking", "Stretching", "Limbs" }
+local tabNames = { "Reanims", "Favs", "Custom", "Binds", "States", "Speed", "Copier", "Tracking", "Stretching", "Limbs", "Studio" }
 local tabButtons = {}
 local switchTab -- forward declaration for early click binding
 
@@ -1793,6 +1793,7 @@ limbsPanel.CanvasSize = UDim2.new(0, 0, 0, #limbDefinitions * 56 + 80)
 local copierPanel = nil
 local trackingPanel = nil
 local stretchingPanel = nil
+local studioPanel = nil
 local currentlyBindingTracking = nil
 local htCardUI = nil
 local laCardUI = nil
@@ -2958,6 +2959,229 @@ local function buildStretchingPanel(parent)
     return stretchingPanel
 end
 
+-- ═══════════════════════════════════════════════════
+-- BUILDER: STUDIO TAB (Eternity Studio Sequencer Launcher)
+-- ═══════════════════════════════════════════════════
+local function buildStudioPanel(parent)
+    local panel = Instance.new("ScrollingFrame")
+    panel.Size = UDim2.new(1, 0, 1, 0)
+    panel.BackgroundTransparency = 1
+    panel.BorderSizePixel = 0
+    panel.ScrollBarThickness = 3
+    panel.ScrollBarImageColor3 = C.accent
+    panel.ScrollBarImageTransparency = 0.6
+    pcall(function() panel.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
+    panel.CanvasSize = UDim2.new(0, 0, 0, 480)
+    panel.Visible = false
+    panel.Parent = parent
+
+    local padding = Instance.new("UIPadding", panel)
+    padding.PaddingLeft = UDim.new(0, 2)
+    padding.PaddingRight = UDim.new(0, 4)
+    padding.PaddingTop = UDim.new(0, 2)
+    padding.PaddingBottom = UDim.new(0, 14)
+
+    local layout = Instance.new("UIListLayout", panel)
+    layout.Padding = UDim.new(0, 8)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local header = Instance.new("TextLabel", panel)
+    header.Size = UDim2.new(1, 0, 0, 16)
+    header.BackgroundTransparency = 1
+    header.Text = "ETERNITY STUDIO"
+    header.TextColor3 = C.textMuted
+    header.Font = Enum.Font.GothamBold
+    header.TextSize = 10
+    header.TextXAlignment = Enum.TextXAlignment.Left
+    header.LayoutOrder = 1
+
+    -- Card 1: Master Studio Launch / Toggle Card
+    local masterCard = Instance.new("Frame", panel)
+    masterCard.Size = UDim2.new(1, 0, 0, 92)
+    masterCard.BackgroundColor3 = C.bgCard
+    masterCard.LayoutOrder = 2
+    applyCorner(masterCard, 8)
+    applyStroke(masterCard, C.divider, 1, 0)
+
+    local titleLbl = Instance.new("TextLabel", masterCard)
+    titleLbl.Size = UDim2.new(1, -120, 0, 18)
+    titleLbl.Position = UDim2.new(0, 12, 0, 8)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Text = "Timeline Sequencer & Video Editor"
+    titleLbl.TextColor3 = C.text
+    titleLbl.Font = Enum.Font.GothamBold
+    titleLbl.TextSize = 11
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local descLbl = Instance.new("TextLabel", masterCard)
+    descLbl.Size = UDim2.new(1, -120, 0, 14)
+    descLbl.Position = UDim2.new(0, 12, 0, 26)
+    descLbl.BackgroundTransparency = 1
+    descLbl.Text = "Multi-clip sequencing, avatar scrubbing & export suite"
+    descLbl.TextColor3 = C.textMuted
+    descLbl.Font = Enum.Font.GothamMedium
+    descLbl.TextSize = 8.5
+    descLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Live Status Badge
+    local statusBadge = Instance.new("TextLabel", masterCard)
+    statusBadge.Size = UDim2.new(0, 96, 0, 18)
+    statusBadge.Position = UDim2.new(1, -108, 0, 8)
+    statusBadge.BackgroundColor3 = C.surface
+    statusBadge.Text = "CLOSED"
+    statusBadge.TextColor3 = C.textMuted
+    statusBadge.Font = Enum.Font.GothamBold
+    statusBadge.TextSize = 8.5
+    applyCorner(statusBadge, 4)
+    applyStroke(statusBadge, C.divider, 1, 0)
+
+    -- Launch / Toggle Button
+    local launchBtn = Instance.new("TextButton", masterCard)
+    launchBtn.Size = UDim2.new(0.68, -16, 0, 32)
+    launchBtn.Position = UDim2.new(0, 12, 0, 48)
+    launchBtn.BackgroundColor3 = C.accent
+    launchBtn.Text = "LAUNCH ETERNITY STUDIO"
+    launchBtn.TextColor3 = Color3.fromRGB(8, 8, 10)
+    launchBtn.Font = Enum.Font.GothamBold
+    launchBtn.TextSize = 9.5
+    launchBtn.AutoButtonColor = false
+    applyCorner(launchBtn, 6)
+
+    local resetBtn = Instance.new("TextButton", masterCard)
+    resetBtn.Size = UDim2.new(0.32, -8, 0, 32)
+    resetBtn.Position = UDim2.new(0.68, 0, 0, 48)
+    resetBtn.BackgroundColor3 = C.surface
+    resetBtn.Text = "RELOAD"
+    resetBtn.TextColor3 = C.textDim
+    resetBtn.Font = Enum.Font.GothamBold
+    resetBtn.TextSize = 9
+    resetBtn.AutoButtonColor = false
+    applyCorner(resetBtn, 6)
+    applyStroke(resetBtn, C.divider, 1, 0)
+
+    local function updateStatus()
+        local open = (api and api.is_studio_open and api.is_studio_open()) or (CoreGui:FindFirstChild("EternityStudioTimelineEditor") and CoreGui.EternityStudioTimelineEditor.Enabled)
+        if open then
+            statusBadge.Text = "ACTIVE"
+            statusBadge.TextColor3 = C.green
+            launchBtn.Text = "CLOSE STUDIO"
+            launchBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+            launchBtn.TextColor3 = C.text
+        else
+            statusBadge.Text = "CLOSED"
+            statusBadge.TextColor3 = C.textMuted
+            launchBtn.Text = "LAUNCH ETERNITY STUDIO"
+            launchBtn.BackgroundColor3 = C.accent
+            launchBtn.TextColor3 = Color3.fromRGB(8, 8, 10)
+        end
+    end
+
+    launchBtn.MouseButton1Click:Connect(function()
+        if api and api.toggle_studio then
+            api.toggle_studio()
+        else
+            local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+            if existing then
+                existing.Enabled = not existing.Enabled
+            else
+                pcall(function()
+                    if isfile and isfile("EternityStudio.lua") then
+                        loadstring(readfile("EternityStudio.lua"))()
+                    elseif isfile and isfile("EternityStudio") then
+                        loadstring(readfile("EternityStudio"))()
+                    else
+                        loadstring(game:HttpGet("https://raw.githubusercontent.com/hor1zencodes/idk/main/EternityStudio.lua"))()
+                    end
+                end)
+            end
+        end
+        task.wait(0.1)
+        updateStatus()
+    end)
+
+    resetBtn.MouseButton1Click:Connect(function()
+        local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+        if existing then existing:Destroy() end
+        task.wait(0.05)
+        pcall(function()
+            if isfile and isfile("EternityStudio.lua") then
+                loadstring(readfile("EternityStudio.lua"))()
+            elseif isfile and isfile("EternityStudio") then
+                loadstring(readfile("EternityStudio"))()
+            else
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/hor1zencodes/idk/main/EternityStudio.lua"))()
+            end
+        end)
+        task.wait(0.1)
+        updateStatus()
+    end)
+
+    local function createFeatureCard(title, desc, badgeTxt, iconTxt, order)
+        local c = Instance.new("Frame", panel)
+        c.Size = UDim2.new(1, 0, 0, 50)
+        c.BackgroundColor3 = C.bgCard
+        c.LayoutOrder = order
+        applyCorner(c, 8)
+        applyStroke(c, C.divider, 1, 0)
+
+        local ic = Instance.new("TextLabel", c)
+        ic.Size = UDim2.new(0, 36, 1, 0)
+        ic.Position = UDim2.new(0, 6, 0, 0)
+        ic.BackgroundTransparency = 1
+        ic.Text = iconTxt
+        ic.TextColor3 = C.accent
+        ic.Font = Enum.Font.GothamBold
+        ic.TextSize = 14
+
+        local t = Instance.new("TextLabel", c)
+        t.Size = UDim2.new(1, -120, 0, 16)
+        t.Position = UDim2.new(0, 42, 0, 8)
+        t.BackgroundTransparency = 1
+        t.Text = title
+        t.TextColor3 = C.text
+        t.Font = Enum.Font.GothamBold
+        t.TextSize = 10
+        t.TextXAlignment = Enum.TextXAlignment.Left
+
+        local d = Instance.new("TextLabel", c)
+        d.Size = UDim2.new(1, -50, 0, 14)
+        d.Position = UDim2.new(0, 42, 0, 26)
+        d.BackgroundTransparency = 1
+        d.Text = desc
+        d.TextColor3 = C.textMuted
+        d.Font = Enum.Font.GothamMedium
+        d.TextSize = 8.5
+        d.TextXAlignment = Enum.TextXAlignment.Left
+
+        local b = Instance.new("TextLabel", c)
+        b.Size = UDim2.new(0, 64, 0, 16)
+        b.Position = UDim2.new(1, -74, 0, 8)
+        b.BackgroundColor3 = C.surface
+        b.Text = badgeTxt
+        b.TextColor3 = C.accent
+        b.Font = Enum.Font.GothamBold
+        b.TextSize = 8
+        applyCorner(b, 4)
+        applyStroke(b, C.divider, 1, 0)
+
+        return c
+    end
+
+    createFeatureCard("Multi-Track Timeline Sequencer", "Drag, position, loop & re-time sequential animation clips", "Sequencer", ">", 3)
+    createFeatureCard("Real-Time Avatar Playhead Scrubbing", "Scrub time across tracks to view character pose frame-by-frame", "Pose Sync", "O", 4)
+    createFeatureCard("Precision Clip Trimming & Splitting", "Non-destructive in/out trimming with split point markers", "Trimmer", "/", 5)
+    createFeatureCard("One-Click Merge & Catalog Export", "Merge tracks to single Lua file; auto-saves into Custom tab", "Catalog", "+", 6)
+
+    panel:GetPropertyChangedSignal("Visible"):Connect(function()
+        if panel.Visible then
+            updateStatus()
+        end
+    end)
+
+    return panel
+end
+
+
 
 -- ═══════════════════════════════════════════════════
 -- BUILDER: TRACKING & STRETCHING RUNTIME ENGINE
@@ -3170,6 +3394,9 @@ if not ok3 then warn("Zen Reanimations [Tracking Error]: " .. tostring(err3)) en
 
 local ok4, err4 = pcall(function() stretchingPanel = buildStretchingPanel(contentArea) end)
 if not ok4 then warn("Zen Reanimations [Stretching Error]: " .. tostring(err4)) end
+
+local ok5, err5 = pcall(function() studioPanel = buildStudioPanel(contentArea) end)
+if not ok5 then warn("Zen Reanimations [Studio Error]: " .. tostring(err5)) end
 
 
 -- ═══════════════════════════════════════════════════
@@ -3523,6 +3750,7 @@ switchTab = function(tab)
     if copierPanel then copierPanel.Visible = (tab == "Copier") end
     if trackingPanel then trackingPanel.Visible = (tab == "Tracking") end
     if stretchingPanel then stretchingPanel.Visible = (tab == "Stretching") end
+    if studioPanel then studioPanel.Visible = (tab == "Studio") end
     limbsPanel.Visible      = (tab == "Limbs")
 
     local activePanel = isAnimListTab and listPanel
@@ -3533,6 +3761,7 @@ switchTab = function(tab)
         or (tab == "Tracking" and trackingPanel)
         or (tab == "Stretching" and stretchingPanel)
         or (tab == "Limbs" and limbsPanel)
+        or (tab == "Studio" and studioPanel)
 
     if activePanel then
         activePanel.Position = UDim2.new(0, 0, 0, 6)

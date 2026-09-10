@@ -1136,4 +1136,54 @@ API.unhide_all_limbs = function()
 	end
 end;
 
+--- Launches Eternity Studio Timeline Sequencer & Video Editor
+API.open_studio = function()
+	local CoreGui = game:GetService("CoreGui")
+	local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+	if existing then
+		existing.Enabled = true
+		return existing
+	end
+	pcall(function()
+		if isfile and isfile("EternityStudio.lua") then
+			loadstring(readfile("EternityStudio.lua"))()
+		elseif isfile and isfile("EternityStudio") then
+			loadstring(readfile("EternityStudio"))()
+		else
+			loadstring(game:HttpGet("https://raw.githubusercontent.com/hor1zencodes/idk/main/EternityStudio.lua"))()
+		end
+	end)
+	return CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+end;
+
+--- Closes Eternity Studio
+API.close_studio = function()
+	local CoreGui = game:GetService("CoreGui")
+	local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+	if existing then
+		existing.Enabled = false
+	end
+end;
+
+--- Toggles Eternity Studio
+API.toggle_studio = function()
+	local CoreGui = game:GetService("CoreGui")
+	local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+	if existing then
+		existing.Enabled = not existing.Enabled
+		return existing.Enabled
+	else
+		API.open_studio()
+		return true
+	end
+end;
+
+--- Checks if Eternity Studio is currently active/open
+API.is_studio_open = function()
+	local CoreGui = game:GetService("CoreGui")
+	local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+	return (existing ~= nil and existing.Enabled == true)
+end;
+
 return API;
+
