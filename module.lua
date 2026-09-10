@@ -1136,10 +1136,59 @@ API.unhide_all_limbs = function()
 	end
 end;
 
+local function getAllStudioGuis()
+	local list = {}
+	local seen = {}
+	local function add(inst)
+		if inst and not seen[inst] then
+			seen[inst] = true
+			table.insert(list, inst)
+		end
+	end
+	if _G._EternityStudioGui and _G._EternityStudioGui.Parent then
+		add(_G._EternityStudioGui)
+	end
+	local gHui = (gethui and gethui())
+	if gHui then
+		for _, c in ipairs(gHui:GetChildren()) do
+			if c.Name == "EternityStudioTimelineEditor" or c.Name == "UnicornStudioTimelineEditor" or c.Name == "ZenStudioTimelineEditor" then
+				add(c)
+			end
+		end
+	end
+	local CoreGui = game:GetService("CoreGui")
+	if CoreGui then
+		for _, c in ipairs(CoreGui:GetChildren()) do
+			if c.Name == "EternityStudioTimelineEditor" or c.Name == "UnicornStudioTimelineEditor" or c.Name == "ZenStudioTimelineEditor" then
+				add(c)
+			end
+		end
+	end
+	local Players = game:GetService("Players")
+	local lp = Players.LocalPlayer
+	if lp and lp:FindFirstChild("PlayerGui") then
+		for _, c in ipairs(lp.PlayerGui:GetChildren()) do
+			if c.Name == "EternityStudioTimelineEditor" or c.Name == "UnicornStudioTimelineEditor" or c.Name == "ZenStudioTimelineEditor" then
+				add(c)
+			end
+		end
+	end
+	return list
+end
+
+local function getStudioGui()
+	local all = getAllStudioGuis()
+	if #all > 1 then
+		for i = 2, #all do
+			pcall(function() all[i]:Destroy() end)
+		end
+	end
+	return all[1]
+end
+
 --- Launches Eternity Studio Timeline Sequencer & Video Editor
 API.open_studio = function()
-	local CoreGui = game:GetService("CoreGui")
-	local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+	local existing = getStudioGui()
 	if existing then
 		existing.Enabled = true
 		return existing
@@ -1153,24 +1202,29 @@ API.open_studio = function()
 			loadstring(game:HttpGet("https://raw.githubusercontent.com/hor1zencodes/idk/main/EternityStudio.lua"))()
 		end
 	end)
-	return CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+	return getStudioGui()
 end;
 
 --- Closes Eternity Studio
 API.close_studio = function()
-	local CoreGui = game:GetService("CoreGui")
-	local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
-	if existing then
-		existing:Destroy()
+	local all = getAllStudioGuis()
+	for _, g in ipairs(all) do
+		pcall(function() g:Destroy() end)
 	end
+	_G._EternityStudioGui = nil
+	_G._EternityStudioToggle = nil
+	_G._EternityStudioLoaded = false
 end;
 
 --- Toggles Eternity Studio
 API.toggle_studio = function()
-	local CoreGui = game:GetService("CoreGui")
-	local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+	local existing = getStudioGui()
 	if existing then
-		existing.Enabled = not existing.Enabled
+		if _G._EternityStudioToggle then
+			_G._EternityStudioToggle()
+		else
+			existing.Enabled = not existing.Enabled
+		end
 		return existing.Enabled
 	else
 		API.open_studio()
@@ -1180,8 +1234,7 @@ end;
 
 --- Checks if Eternity Studio is currently active/open
 API.is_studio_open = function()
-	local CoreGui = game:GetService("CoreGui")
-	local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+	local existing = getStudioGui()
 	return (existing ~= nil and existing.Enabled == true)
 end;
 

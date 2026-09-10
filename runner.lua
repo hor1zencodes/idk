@@ -207,6 +207,7 @@ local currentSpeed = savedConfig.speed or 1.0
 local currentPlayingAnim = nil
 local manualAnimationPlaying = false
 local currentTab = "Reanims"
+_G._RunnerActive = true
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "ZenReanimationsRunner"
@@ -353,7 +354,7 @@ minBtn.MouseButton1Click:Connect(toggleMinimize)
 
 closeBtn.MouseEnter:Connect(function() tween(closeBtn, {BackgroundColor3 = Color3.fromRGB(255, 130, 130)}, 0.15) end)
 closeBtn.MouseLeave:Connect(function() tween(closeBtn, {BackgroundColor3 = Color3.fromRGB(255, 90, 90)}, 0.15) end)
-closeBtn.MouseButton1Click:Connect(function() gui:Destroy() end)
+closeBtn.MouseButton1Click:Connect(function() _G._RunnerActive = nil; gui:Destroy() end)
 
 -- Window Dragging
 local dragging, dragStart, startPos
@@ -2967,6 +2968,112 @@ end
 -- ═══════════════════════════════════════════════════
 -- BUILDER: STUDIO TAB (Eternity Studio Sequencer Launcher)
 -- ═══════════════════════════════════════════════════
+local StudioMgr = {
+    isLaunching = false,
+    lastToggle = 0,
+}
+
+function StudioMgr.getAllGuis()
+    local list = {}
+    local seen = {}
+    local function add(inst)
+        if inst and not seen[inst] then
+            seen[inst] = true
+            table.insert(list, inst)
+        end
+    end
+    if _G._EternityStudioGui and _G._EternityStudioGui.Parent then
+        add(_G._EternityStudioGui)
+    end
+    local gHui = (gethui and gethui())
+    if gHui then
+        for _, c in ipairs(gHui:GetChildren()) do
+            if c.Name == "EternityStudioTimelineEditor" or c.Name == "UnicornStudioTimelineEditor" or c.Name == "ZenStudioTimelineEditor" then
+                add(c)
+            end
+        end
+    end
+    if CoreGui then
+        for _, c in ipairs(CoreGui:GetChildren()) do
+            if c.Name == "EternityStudioTimelineEditor" or c.Name == "UnicornStudioTimelineEditor" or c.Name == "ZenStudioTimelineEditor" then
+                add(c)
+            end
+        end
+    end
+    local lp = Players.LocalPlayer
+    if lp and lp:FindFirstChild("PlayerGui") then
+        for _, c in ipairs(lp.PlayerGui:GetChildren()) do
+            if c.Name == "EternityStudioTimelineEditor" or c.Name == "UnicornStudioTimelineEditor" or c.Name == "ZenStudioTimelineEditor" then
+                add(c)
+            end
+        end
+    end
+    return list
+end
+
+function StudioMgr.getGui()
+    local all = StudioMgr.getAllGuis()
+    if #all > 1 then
+        for i = 2, #all do
+            pcall(function() all[i]:Destroy() end)
+        end
+    end
+    return all[1]
+end
+
+function StudioMgr.launch()
+    if StudioMgr.isLaunching then return end
+    local existing = StudioMgr.getGui()
+    if existing then
+        existing.Enabled = true
+        return
+    end
+    StudioMgr.isLaunching = true
+    task.spawn(function()
+        pcall(function()
+            if isfile and isfile("EternityStudio.lua") then
+                loadstring(readfile("EternityStudio.lua"))()
+            elseif isfile and isfile("EternityStudio") then
+                loadstring(readfile("EternityStudio"))()
+            else
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/hor1zencodes/idk/main/EternityStudio.lua"))()
+            end
+        end)
+        task.wait(0.5)
+        StudioMgr.isLaunching = false
+    end)
+end
+
+function StudioMgr.close()
+    local all = StudioMgr.getAllGuis()
+    for _, g in ipairs(all) do
+        pcall(function() g:Destroy() end)
+    end
+    _G._EternityStudioGui = nil
+    _G._EternityStudioToggle = nil
+    _G._EternityStudioLoaded = false
+    if api and api.close_studio then
+        pcall(function() api.close_studio() end)
+    end
+end
+
+function StudioMgr.toggle()
+    local now = os.clock()
+    if now - StudioMgr.lastToggle < 0.25 then return end
+    StudioMgr.lastToggle = now
+
+    local existing = StudioMgr.getGui()
+    if not existing then
+        StudioMgr.launch()
+    else
+        if _G._EternityStudioToggle then
+            _G._EternityStudioToggle()
+        else
+            existing.Enabled = not existing.Enabled
+        end
+    end
+end
+
 local function buildStudioPanel(parent)
     local panel = Instance.new("ScrollingFrame")
     panel.Size = UDim2.new(1, 0, 1, 0)
@@ -3079,8 +3186,8 @@ local function buildStudioPanel(parent)
     applyStroke(resetBtn, C.divider, 1, 0)
 
     local function updateStatus()
-        local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
-        local isLoaded = (existing ~= nil)
+        local existing = StudioMgr.getGui()
+        local isLoaded = (existing ~= nil and existing.Parent ~= nil)
         local isVisible = (isLoaded and existing.Enabled == true)
 
         if isVisible then
@@ -3108,50 +3215,22 @@ local function buildStudioPanel(parent)
     end
 
     launchBtn.MouseButton1Click:Connect(function()
-        local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
-        if existing then
-            existing.Enabled = not existing.Enabled
-        else
-            pcall(function()
-                if isfile and isfile("EternityStudio.lua") then
-                    loadstring(readfile("EternityStudio.lua"))()
-                elseif isfile and isfile("EternityStudio") then
-                    loadstring(readfile("EternityStudio"))()
-                else
-                    loadstring(game:HttpGet("https://raw.githubusercontent.com/hor1zencodes/idk/main/EternityStudio.lua"))()
-                end
-            end)
-        end
-        task.wait(0.1)
+        StudioMgr.toggle()
+        task.wait(0.15)
         updateStatus()
     end)
 
     closeStudioBtn.MouseButton1Click:Connect(function()
-        local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
-        if existing then
-            existing:Destroy()
-        end
-        if api and api.close_studio then
-            api.close_studio()
-        end
-        task.wait(0.1)
+        StudioMgr.close()
+        task.wait(0.15)
         updateStatus()
     end)
 
     resetBtn.MouseButton1Click:Connect(function()
-        local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
-        if existing then existing:Destroy() end
-        task.wait(0.05)
-        pcall(function()
-            if isfile and isfile("EternityStudio.lua") then
-                loadstring(readfile("EternityStudio.lua"))()
-            elseif isfile and isfile("EternityStudio") then
-                loadstring(readfile("EternityStudio"))()
-            else
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/hor1zencodes/idk/main/EternityStudio.lua"))()
-            end
-        end)
+        StudioMgr.close()
         task.wait(0.1)
+        StudioMgr.launch()
+        task.wait(0.3)
         updateStatus()
     end)
 
@@ -4078,20 +4157,7 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     -- Check studio visibility toggle keybind
     local studioKey = savedConfig.studioToggleKey or "K"
     if input.KeyCode.Name == studioKey or (studioKey == "K" and input.KeyCode == Enum.KeyCode.K) then
-        local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
-        if not existing then
-            -- If not loaded yet, launch studio
-            pcall(function()
-                if isfile and isfile("EternityStudio.lua") then
-                    loadstring(readfile("EternityStudio.lua"))()
-                elseif isfile and isfile("EternityStudio") then
-                    loadstring(readfile("EternityStudio"))()
-                else
-                    loadstring(game:HttpGet("https://raw.githubusercontent.com/hor1zencodes/idk/main/EternityStudio.lua"))()
-                end
-            end)
-        end
-        -- If already loaded, EternityStudio.lua's own listener handles toggleStudioHUD cleanly without race
+        StudioMgr.toggle()
         return
     end
 

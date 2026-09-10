@@ -13,15 +13,60 @@ local Players = game:GetService("Players")
 
 local player = Players.LocalPlayer
 
--- Clean up existing instance if already open
-if CoreGui:FindFirstChild("EternityStudioTimelineEditor") then
-    CoreGui.EternityStudioTimelineEditor:Destroy()
+-- ══════════════════════════════════════════════════════════════════
+-- SINGLETON GUARD: If Eternity Studio is already active, toggle & exit!
+-- ══════════════════════════════════════════════════════════════════
+local function getAllStudioGuis()
+    local list = {}
+    local seen = {}
+    local function add(inst)
+        if inst and not seen[inst] then
+            seen[inst] = true
+            table.insert(list, inst)
+        end
+    end
+    if _G._EternityStudioGui and _G._EternityStudioGui.Parent then
+        add(_G._EternityStudioGui)
+    end
+    local gHui = (gethui and gethui())
+    if gHui then
+        for _, c in ipairs(gHui:GetChildren()) do
+            if c.Name == "EternityStudioTimelineEditor" or c.Name == "UnicornStudioTimelineEditor" or c.Name == "ZenStudioTimelineEditor" then
+                add(c)
+            end
+        end
+    end
+    if CoreGui then
+        for _, c in ipairs(CoreGui:GetChildren()) do
+            if c.Name == "EternityStudioTimelineEditor" or c.Name == "UnicornStudioTimelineEditor" or c.Name == "ZenStudioTimelineEditor" then
+                add(c)
+            end
+        end
+    end
+    if player and player:FindFirstChild("PlayerGui") then
+        for _, c in ipairs(player.PlayerGui:GetChildren()) do
+            if c.Name == "EternityStudioTimelineEditor" or c.Name == "UnicornStudioTimelineEditor" or c.Name == "ZenStudioTimelineEditor" then
+                add(c)
+            end
+        end
+    end
+    return list
 end
-if CoreGui:FindFirstChild("UnicornStudioTimelineEditor") then
-    CoreGui.UnicornStudioTimelineEditor:Destroy()
-end
-if CoreGui:FindFirstChild("ZenStudioTimelineEditor") then
-    CoreGui.ZenStudioTimelineEditor:Destroy()
+
+local existingGuis = getAllStudioGuis()
+if #existingGuis > 0 then
+    -- Clean up any extra duplicates
+    for i = 2, #existingGuis do
+        pcall(function() existingGuis[i]:Destroy() end)
+    end
+    local activeGui = existingGuis[1]
+    _G._EternityStudioGui = activeGui
+    if _G._EternityStudioToggle then
+        _G._EternityStudioToggle()
+    else
+        activeGui.Enabled = not activeGui.Enabled
+    end
+    return
 end
 
 -- ══════════════════════════════════════════════════════════════════
@@ -641,6 +686,9 @@ pcall(function()
         screenGui.Parent = CoreGui
     end
 end)
+
+_G._EternityStudioGui = screenGui
+_G._EternityStudioLoaded = true
 
 -- Transparent Full-Screen Viewport HUD Container
 -- (100% transparent center so user's Roblox character performing reanims is completely visible!)
@@ -1737,18 +1785,22 @@ emptyTrackLabel.Parent = trackLane
 local lastToggleTime = 0
 toggleStudioHUD = function()
     local now = os.clock()
-    if now - lastToggleTime < 0.1 then return end
+    if now - lastToggleTime < 0.25 then return end
     lastToggleTime = now
 
     screenGui.Enabled = not screenGui.Enabled
 end
 
+_G._EternityStudioToggle = toggleStudioHUD
+
 -- Hook up yellow minimize dot and floating restore pill
 minimizeBtn.MouseButton1Click:Connect(toggleStudioHUD)
 floatingPill.MouseButton1Click:Connect(toggleStudioHUD)
 
--- Global Toggle Keybind: K or custom from config
+-- Global Toggle Keybind: K or custom from config (only active if runner is not actively handling keybinds)
 UserInputService.InputBegan:Connect(function(input, gpe)
+    if not screenGui or not screenGui.Parent then return end
+    if _G._RunnerActive then return end -- Let runner.lua manage the keybind exclusively
     if gpe or UserInputService:GetFocusedTextBox() then return end
     local studioKey = "K"
     pcall(function()
@@ -1781,7 +1833,12 @@ closeBtn.MouseButton1Click:Connect(function()
         end
         restoreAvatarToNormal(player.Character)
     end)
-    screenGui:Destroy()
+    _G._EternityStudioGui = nil
+    _G._EternityStudioToggle = nil
+    _G._EternityStudioLoaded = false
+    for _, g in ipairs(getAllStudioGuis()) do
+        pcall(function() g:Destroy() end)
+    end
 end)
 
 -- 8. RENDER & INTERACTION ENGINE
