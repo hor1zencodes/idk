@@ -375,7 +375,7 @@ end)
 -- ═══════════════════════════════════════════════════
 -- 5. SUB-TAB CAPSULE BAR (from forjnkie.lua createSubTabBar)
 -- ═══════════════════════════════════════════════════
-local tabNames = { "Reanims", "Favs", "Custom", "Binds", "States", "Speed", "Limbs" }
+local tabNames = { "Reanims", "Favs", "Custom", "Binds", "States", "Speed", "Copier", "Tracking", "Stretching", "Limbs" }
 local tabButtons = {}
 local switchTab -- forward declaration for early click binding
 
@@ -423,7 +423,7 @@ tabsScroll.ScrollingDirection = Enum.ScrollingDirection.X
 pcall(function()
     tabsScroll.AutomaticCanvasSize = Enum.AutomaticSize.X
 end)
-tabsScroll.CanvasSize = UDim2.new(0, #tabNames * 56 + 10, 0, 0)
+tabsScroll.CanvasSize = UDim2.new(0, #tabNames * 62 + 10, 0, 0)
 tabsScroll.Parent = subTabBar
 
 local tabsLayout = Instance.new("UIListLayout")
@@ -435,7 +435,7 @@ tabsLayout.Parent = tabsScroll
 
 for i, tName in ipairs(tabNames) do
     local tb = Instance.new("TextButton")
-    tb.Size = UDim2.new(0, 52, 1, 0)
+    tb.Size = UDim2.new(0, 58, 1, 0)
     tb.BackgroundColor3 = (i == 1) and C.accent or Color3.fromRGB(30, 30, 35)
     tb.BackgroundTransparency = (i == 1) and 0 or 0.5
     tb.Text = tName
@@ -1784,6 +1784,1327 @@ limbsPanel.CanvasSize = UDim2.new(0, 0, 0, #limbDefinitions * 56 + 80)
 
 
 -- ═══════════════════════════════════════════════════
+-- PANEL 6: COPIER TAB (Reanimation Mirror Engine)
+-- ═══════════════════════════════════════════════════
+local copierPanel = Instance.new("ScrollingFrame")
+copierPanel.Size = UDim2.new(1, 0, 1, 0)
+copierPanel.BackgroundTransparency = 1
+copierPanel.BorderSizePixel = 0
+copierPanel.ScrollBarThickness = 3
+copierPanel.ScrollBarImageColor3 = C.accent
+copierPanel.ScrollBarImageTransparency = 0.6
+pcall(function() copierPanel.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
+copierPanel.CanvasSize = UDim2.new(0, 0, 0, 580)
+copierPanel.Visible = false
+copierPanel.Parent = contentArea
+
+local copierPadding = Instance.new("UIPadding", copierPanel)
+copierPadding.PaddingLeft = UDim.new(0, 2)
+copierPadding.PaddingRight = UDim.new(0, 4)
+copierPadding.PaddingTop = UDim.new(0, 2)
+copierPadding.PaddingBottom = UDim.new(0, 14)
+
+local copierLayout = Instance.new("UIListLayout", copierPanel)
+copierLayout.Padding = UDim.new(0, 8)
+copierLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local copierHeader = Instance.new("TextLabel", copierPanel)
+copierHeader.Size = UDim2.new(1, 0, 0, 16)
+copierHeader.BackgroundTransparency = 1
+copierHeader.Text = "REANIMATION COPIER"
+copierHeader.TextColor3 = C.textMuted
+copierHeader.Font = Enum.Font.GothamBold
+copierHeader.TextSize = 10
+copierHeader.TextXAlignment = Enum.TextXAlignment.Left
+copierHeader.LayoutOrder = 1
+
+-- Copier Variables & State
+local acEnabled = false
+local acFreeze = false
+local acFreeRoam = false
+local acSelectedPlayer = nil
+local acFrozenPos = nil
+local acSideDist = 2.0
+local acForwardDist = 2.0
+local acSideMode = "Left"
+local acForwardMode = nil
+local acConn = nil
+local acSavedStates = {}
+local acSideDragging = false
+local acFwdDragging = false
+
+-- Card 1: Master Copier Toggle
+local acToggleCard = Instance.new("Frame", copierPanel)
+acToggleCard.Size = UDim2.new(1, 0, 0, 48)
+acToggleCard.BackgroundColor3 = C.bgCard
+acToggleCard.LayoutOrder = 2
+applyCorner(acToggleCard, 8)
+applyStroke(acToggleCard, C.divider, 1, 0)
+
+local acToggleTitle = Instance.new("TextLabel", acToggleCard)
+acToggleTitle.Size = UDim2.new(1, -70, 0, 18)
+acToggleTitle.Position = UDim2.new(0, 12, 0, 6)
+acToggleTitle.BackgroundTransparency = 1
+acToggleTitle.Text = "Animation Copier"
+acToggleTitle.TextColor3 = C.text
+acToggleTitle.Font = Enum.Font.GothamBold
+acToggleTitle.TextSize = 10.5
+acToggleTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local acToggleSub = Instance.new("TextLabel", acToggleCard)
+acToggleSub.Size = UDim2.new(1, -70, 0, 16)
+acToggleSub.Position = UDim2.new(0, 12, 0, 24)
+acToggleSub.BackgroundTransparency = 1
+acToggleSub.Text = "Mirror target player's exact pose & animations"
+acToggleSub.TextColor3 = C.textMuted
+acToggleSub.Font = Enum.Font.GothamMedium
+acToggleSub.TextSize = 9
+acToggleSub.TextXAlignment = Enum.TextXAlignment.Left
+
+local acMasterTrack, acMasterKnob, acMasterGlow = createEternityToggleSwitch(acToggleCard, -54, -11)
+local acMasterBtn = Instance.new("TextButton", acMasterTrack)
+acMasterBtn.Size = UDim2.new(1, 0, 1, 0)
+acMasterBtn.BackgroundTransparency = 1
+acMasterBtn.Text = ""
+
+-- Card 2: Target Player Search & List
+local acPlayerCard = Instance.new("Frame", copierPanel)
+acPlayerCard.Size = UDim2.new(1, 0, 0, 190)
+acPlayerCard.BackgroundColor3 = C.bgCard
+acPlayerCard.LayoutOrder = 3
+applyCorner(acPlayerCard, 8)
+applyStroke(acPlayerCard, C.divider, 1, 0)
+
+local acPlayerTitle = Instance.new("TextLabel", acPlayerCard)
+acPlayerTitle.Size = UDim2.new(1, -20, 0, 16)
+acPlayerTitle.Position = UDim2.new(0, 10, 0, 6)
+acPlayerTitle.BackgroundTransparency = 1
+acPlayerTitle.Text = "SELECT TARGET PLAYER"
+acPlayerTitle.TextColor3 = C.accent
+acPlayerTitle.Font = Enum.Font.GothamBold
+acPlayerTitle.TextSize = 9.5
+acPlayerTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local acSearchBox = Instance.new("TextBox", acPlayerCard)
+acSearchBox.Size = UDim2.new(1, -20, 0, 26)
+acSearchBox.Position = UDim2.new(0, 10, 0, 26)
+acSearchBox.BackgroundColor3 = C.input
+acSearchBox.PlaceholderText = "Search player by name..."
+acSearchBox.PlaceholderColor3 = C.textMuted
+acSearchBox.Text = ""
+acSearchBox.TextColor3 = C.text
+acSearchBox.Font = Enum.Font.GothamMedium
+acSearchBox.TextSize = 10
+acSearchBox.ClearTextOnFocus = false
+applyCorner(acSearchBox, 6)
+applyStroke(acSearchBox, C.divider, 1, 0.2)
+
+local acSearchPad = Instance.new("UIPadding", acSearchBox)
+acSearchPad.PaddingLeft = UDim.new(0, 8)
+
+local acPlayerList = Instance.new("ScrollingFrame", acPlayerCard)
+acPlayerList.Size = UDim2.new(1, -20, 0, 124)
+acPlayerList.Position = UDim2.new(0, 10, 0, 58)
+acPlayerList.BackgroundColor3 = C.surface
+acPlayerList.BackgroundTransparency = 0.5
+acPlayerList.BorderSizePixel = 0
+acPlayerList.ScrollBarThickness = 3
+acPlayerList.ScrollBarImageColor3 = C.accent
+acPlayerList.ScrollBarImageTransparency = 0.5
+applyCorner(acPlayerList, 6)
+
+local acListLayout = Instance.new("UIListLayout", acPlayerList)
+acListLayout.Padding = UDim.new(0, 3)
+acListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+acListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    acPlayerList.CanvasSize = UDim2.new(0, 0, 0, acListLayout.AbsoluteContentSize.Y + 6)
+end)
+
+-- Card 3: Freeze Mode
+local acFreezeCard = Instance.new("Frame", copierPanel)
+acFreezeCard.Size = UDim2.new(1, 0, 0, 44)
+acFreezeCard.BackgroundColor3 = C.bgCard
+acFreezeCard.LayoutOrder = 4
+applyCorner(acFreezeCard, 8)
+applyStroke(acFreezeCard, C.divider, 1, 0)
+
+local acFreezeTitle = Instance.new("TextLabel", acFreezeCard)
+acFreezeTitle.Size = UDim2.new(1, -70, 0, 16)
+acFreezeTitle.Position = UDim2.new(0, 12, 0, 6)
+acFreezeTitle.BackgroundTransparency = 1
+acFreezeTitle.Text = "FREEZE MODE"
+acFreezeTitle.TextColor3 = C.text
+acFreezeTitle.Font = Enum.Font.GothamBold
+acFreezeTitle.TextSize = 10
+acFreezeTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local acFreezeSub = Instance.new("TextLabel", acFreezeCard)
+acFreezeSub.Size = UDim2.new(1, -70, 0, 14)
+acFreezeSub.Position = UDim2.new(0, 12, 0, 22)
+acFreezeSub.BackgroundTransparency = 1
+acFreezeSub.Text = "Freeze in place; spins & poses on the spot"
+acFreezeSub.TextColor3 = C.textMuted
+acFreezeSub.Font = Enum.Font.GothamMedium
+acFreezeSub.TextSize = 8.5
+acFreezeSub.TextXAlignment = Enum.TextXAlignment.Left
+
+local acFreezeTrack, acFreezeKnob, acFreezeGlow = createEternityToggleSwitch(acFreezeCard, -54, -11)
+local acFreezeBtn = Instance.new("TextButton", acFreezeTrack)
+acFreezeBtn.Size = UDim2.new(1, 0, 1, 0)
+acFreezeBtn.BackgroundTransparency = 1
+acFreezeBtn.Text = ""
+
+-- Card 4: FreeRoam Mode
+local acFreeRoamCard = Instance.new("Frame", copierPanel)
+acFreeRoamCard.Size = UDim2.new(1, 0, 0, 44)
+acFreeRoamCard.BackgroundColor3 = C.bgCard
+acFreeRoamCard.LayoutOrder = 5
+applyCorner(acFreeRoamCard, 8)
+applyStroke(acFreeRoamCard, C.divider, 1, 0)
+
+local acFreeRoamTitle = Instance.new("TextLabel", acFreeRoamCard)
+acFreeRoamTitle.Size = UDim2.new(1, -70, 0, 16)
+acFreeRoamTitle.Position = UDim2.new(0, 12, 0, 6)
+acFreeRoamTitle.BackgroundTransparency = 1
+acFreeRoamTitle.Text = "FREEROAM MODE"
+acFreeRoamTitle.TextColor3 = C.text
+acFreeRoamTitle.Font = Enum.Font.GothamBold
+acFreeRoamTitle.TextSize = 10
+acFreeRoamTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local acFreeRoamSub = Instance.new("TextLabel", acFreeRoamCard)
+acFreeRoamSub.Size = UDim2.new(1, -70, 0, 14)
+acFreeRoamSub.Position = UDim2.new(0, 12, 0, 22)
+acFreeRoamSub.BackgroundTransparency = 1
+acFreeRoamSub.Text = "Move freely (WASD) while copying target's animation"
+acFreeRoamSub.TextColor3 = C.textMuted
+acFreeRoamSub.Font = Enum.Font.GothamMedium
+acFreeRoamSub.TextSize = 8.5
+acFreeRoamSub.TextXAlignment = Enum.TextXAlignment.Left
+
+local acFreeRoamTrack, acFreeRoamKnob, acFreeRoamGlow = createEternityToggleSwitch(acFreeRoamCard, -54, -11)
+local acFreeRoamBtn = Instance.new("TextButton", acFreeRoamTrack)
+acFreeRoamBtn.Size = UDim2.new(1, 0, 1, 0)
+acFreeRoamBtn.BackgroundTransparency = 1
+acFreeRoamBtn.Text = ""
+
+-- Card 5: Lateral Offset (Left / Right)
+local acLateralCard = Instance.new("Frame", copierPanel)
+acLateralCard.Size = UDim2.new(1, 0, 0, 66)
+acLateralCard.BackgroundColor3 = C.bgCard
+acLateralCard.LayoutOrder = 6
+applyCorner(acLateralCard, 8)
+applyStroke(acLateralCard, C.divider, 1, 0)
+
+local acLateralTitle = Instance.new("TextLabel", acLateralCard)
+acLateralTitle.Size = UDim2.new(0.5, 0, 0, 16)
+acLateralTitle.Position = UDim2.new(0, 10, 0, 5)
+acLateralTitle.BackgroundTransparency = 1
+acLateralTitle.Text = "LATERAL OFFSET"
+acLateralTitle.TextColor3 = C.textMuted
+acLateralTitle.Font = Enum.Font.GothamBold
+acLateralTitle.TextSize = 9
+acLateralTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local acSideBadge = Instance.new("TextLabel", acLateralCard)
+acSideBadge.Size = UDim2.new(0, 70, 0, 16)
+acSideBadge.Position = UDim2.new(1, -80, 0, 5)
+acSideBadge.BackgroundColor3 = C.surface
+acSideBadge.Text = "2.0 studs"
+acSideBadge.TextColor3 = C.accent
+acSideBadge.Font = Enum.Font.GothamBold
+acSideBadge.TextSize = 8.5
+applyCorner(acSideBadge, 4)
+applyStroke(acSideBadge, C.divider, 1, 0)
+
+local acSideLeft = Instance.new("TextButton", acLateralCard)
+acSideLeft.Position = UDim2.new(0, 10, 0, 24)
+acSideLeft.Size = UDim2.new(0.5, -14, 0, 20)
+acSideLeft.BackgroundColor3 = C.accent
+acSideLeft.Text = "Left"
+acSideLeft.TextColor3 = Color3.fromRGB(8, 8, 10)
+acSideLeft.Font = Enum.Font.GothamBold
+acSideLeft.TextSize = 9
+acSideLeft.AutoButtonColor = false
+applyCorner(acSideLeft, 4)
+
+local acSideRight = Instance.new("TextButton", acLateralCard)
+acSideRight.Position = UDim2.new(0.5, 4, 0, 24)
+acSideRight.Size = UDim2.new(0.5, -14, 0, 20)
+acSideRight.BackgroundColor3 = C.surface
+acSideRight.Text = "Right"
+acSideRight.TextColor3 = C.textDim
+acSideRight.Font = Enum.Font.GothamBold
+acSideRight.TextSize = 9
+acSideRight.AutoButtonColor = false
+applyCorner(acSideRight, 4)
+
+local acSideDistTrack = Instance.new("Frame", acLateralCard)
+acSideDistTrack.Position = UDim2.new(0, 10, 0, 50)
+acSideDistTrack.Size = UDim2.new(1, -20, 0, 6)
+acSideDistTrack.BackgroundColor3 = C.surface
+applyCorner(acSideDistTrack, 3)
+
+local acSideDistFill = Instance.new("Frame", acSideDistTrack)
+acSideDistFill.Size = UDim2.new(0.04, 0, 1, 0)
+acSideDistFill.BackgroundColor3 = C.accent
+applyCorner(acSideDistFill, 3)
+
+local acSideDistHandle = Instance.new("Frame", acSideDistTrack)
+acSideDistHandle.AnchorPoint = Vector2.new(0.5, 0.5)
+acSideDistHandle.Position = UDim2.new(0.04, 0, 0.5, 0)
+acSideDistHandle.Size = UDim2.new(0, 12, 0, 12)
+acSideDistHandle.BackgroundColor3 = C.text
+applyCorner(acSideDistHandle, 6)
+
+-- Card 6: Depth Offset (Front / Back)
+local acDepthCard = Instance.new("Frame", copierPanel)
+acDepthCard.Size = UDim2.new(1, 0, 0, 66)
+acDepthCard.BackgroundColor3 = C.bgCard
+acDepthCard.LayoutOrder = 7
+applyCorner(acDepthCard, 8)
+applyStroke(acDepthCard, C.divider, 1, 0)
+
+local acDepthTitle = Instance.new("TextLabel", acDepthCard)
+acDepthTitle.Size = UDim2.new(0.5, 0, 0, 16)
+acDepthTitle.Position = UDim2.new(0, 10, 0, 5)
+acDepthTitle.BackgroundTransparency = 1
+acDepthTitle.Text = "DEPTH OFFSET"
+acDepthTitle.TextColor3 = C.textMuted
+acDepthTitle.Font = Enum.Font.GothamBold
+acDepthTitle.TextSize = 9
+acDepthTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local acFwdBadge = Instance.new("TextLabel", acDepthCard)
+acFwdBadge.Size = UDim2.new(0, 70, 0, 16)
+acFwdBadge.Position = UDim2.new(1, -80, 0, 5)
+acFwdBadge.BackgroundColor3 = C.surface
+acFwdBadge.Text = "2.0 studs"
+acFwdBadge.TextColor3 = C.accent
+acFwdBadge.Font = Enum.Font.GothamBold
+acFwdBadge.TextSize = 8.5
+applyCorner(acFwdBadge, 4)
+applyStroke(acFwdBadge, C.divider, 1, 0)
+
+local acSideFront = Instance.new("TextButton", acDepthCard)
+acSideFront.Position = UDim2.new(0, 10, 0, 24)
+acSideFront.Size = UDim2.new(0.5, -14, 0, 20)
+acSideFront.BackgroundColor3 = C.surface
+acSideFront.Text = "Front"
+acSideFront.TextColor3 = C.textDim
+acSideFront.Font = Enum.Font.GothamBold
+acSideFront.TextSize = 9
+acSideFront.AutoButtonColor = false
+applyCorner(acSideFront, 4)
+
+local acSideBack = Instance.new("TextButton", acDepthCard)
+acSideBack.Position = UDim2.new(0.5, 4, 0, 24)
+acSideBack.Size = UDim2.new(0.5, -14, 0, 20)
+acSideBack.BackgroundColor3 = C.surface
+acSideBack.Text = "Back"
+acSideBack.TextColor3 = C.textDim
+acSideBack.Font = Enum.Font.GothamBold
+acSideBack.TextSize = 9
+acSideBack.AutoButtonColor = false
+applyCorner(acSideBack, 4)
+
+local acFwdDistTrack = Instance.new("Frame", acDepthCard)
+acFwdDistTrack.Position = UDim2.new(0, 10, 0, 50)
+acFwdDistTrack.Size = UDim2.new(1, -20, 0, 6)
+acFwdDistTrack.BackgroundColor3 = C.surface
+applyCorner(acFwdDistTrack, 3)
+
+local acFwdDistFill = Instance.new("Frame", acFwdDistTrack)
+acFwdDistFill.Size = UDim2.new(0.04, 0, 1, 0)
+acFwdDistFill.BackgroundColor3 = C.accent
+applyCorner(acFwdDistFill, 3)
+
+local acFwdDistHandle = Instance.new("Frame", acFwdDistTrack)
+acFwdDistHandle.AnchorPoint = Vector2.new(0.5, 0.5)
+acFwdDistHandle.Position = UDim2.new(0.04, 0, 0.5, 0)
+acFwdDistHandle.Size = UDim2.new(0, 12, 0, 12)
+acFwdDistHandle.BackgroundColor3 = C.text
+applyCorner(acFwdDistHandle, 6)
+
+-- Card 7: Live Status Box
+local acStatusBox = Instance.new("Frame", copierPanel)
+acStatusBox.Size = UDim2.new(1, 0, 0, 28)
+acStatusBox.BackgroundColor3 = C.bgCard
+acStatusBox.LayoutOrder = 8
+applyCorner(acStatusBox, 6)
+applyStroke(acStatusBox, C.divider, 1, 0)
+
+local acStatusDot = Instance.new("Frame", acStatusBox)
+acStatusDot.Position = UDim2.new(0, 8, 0.5, -3)
+acStatusDot.Size = UDim2.new(0, 6, 0, 6)
+acStatusDot.BackgroundColor3 = C.textMuted
+applyCorner(acStatusDot, 100)
+
+local acStatus = Instance.new("TextLabel", acStatusBox)
+acStatus.BackgroundTransparency = 1
+acStatus.Position = UDim2.new(0, 22, 0, 0)
+acStatus.Size = UDim2.new(1, -28, 1, 0)
+acStatus.Font = Enum.Font.GothamMedium
+acStatus.Text = "OFF - Select a player and toggle ON"
+acStatus.TextColor3 = C.textMuted
+acStatus.TextSize = 8.5
+acStatus.TextXAlignment = Enum.TextXAlignment.Left
+acStatus.TextTruncate = Enum.TextTruncate.AtEnd
+
+-- Copier Helper Functions
+local function acUpdateStatusText()
+    if not acSelectedPlayer then
+        acStatus.Text = acEnabled and "ON - Select a player from list above" or "OFF - Select a player and toggle ON"
+        acStatus.TextColor3 = acEnabled and Color3.fromRGB(240, 200, 80) or C.textMuted
+        acStatusDot.BackgroundColor3 = acEnabled and Color3.fromRGB(240, 200, 80) or C.textMuted
+        return
+    end
+
+    local modeSuffix = ""
+    if acFreeze then
+        modeSuffix = " [Frozen In-Place]"
+    elseif acFreeRoam then
+        modeSuffix = " [FreeRoam]"
+    else
+        local distInfo = {}
+        if acSideMode then table.insert(distInfo, string.format("%s: %.1f", acSideMode, acSideDist)) end
+        if acForwardMode then table.insert(distInfo, string.format("%s: %.1f", acForwardMode, acForwardDist)) end
+        local distStr = (#distInfo > 0) and table.concat(distInfo, " | ") or "In-Place"
+        modeSuffix = " (" .. distStr .. ")"
+    end
+
+    if acEnabled then
+        acStatus.Text = "COPYING " .. acSelectedPlayer.Name .. modeSuffix
+        acStatus.TextColor3 = C.green
+        acStatusDot.BackgroundColor3 = C.green
+    else
+        acStatus.Text = "Selected: " .. acSelectedPlayer.Name .. modeSuffix
+        acStatus.TextColor3 = C.accent
+        acStatusDot.BackgroundColor3 = C.accent
+    end
+end
+
+local function acUpdatePlayerList(term)
+    for _, c in ipairs(acPlayerList:GetChildren()) do
+        if c:IsA("TextButton") then c:Destroy() end
+    end
+    term = (term or ""):lower()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= lp then
+            local name = p.Name .. " (@" .. p.DisplayName .. ")"
+            if term == "" or name:lower():find(term, 1, true) then
+                local btn = Instance.new("TextButton", acPlayerList)
+                btn.BackgroundColor3 = (acSelectedPlayer == p) and C.accent or C.bgCard
+                btn.BackgroundTransparency = (acSelectedPlayer == p) and 0.2 or 0.5
+                btn.BorderSizePixel = 0
+                btn.Size = UDim2.new(1, -6, 0, 24)
+                btn.Font = Enum.Font.GothamMedium
+                btn.Text = "  " .. name
+                btn.TextColor3 = (acSelectedPlayer == p) and Color3.fromRGB(8, 8, 10) or C.text
+                btn.TextSize = 9.5
+                btn.TextXAlignment = Enum.TextXAlignment.Left
+                btn.AutoButtonColor = false
+                btn.TextTruncate = Enum.TextTruncate.AtEnd
+                applyCorner(btn, 4)
+
+                btn.MouseButton1Click:Connect(function()
+                    acSelectedPlayer = p
+                    for _, c2 in ipairs(acPlayerList:GetChildren()) do
+                        if c2:IsA("TextButton") then
+                            local isSel = (c2 == btn)
+                            c2.BackgroundColor3 = isSel and C.accent or C.bgCard
+                            c2.BackgroundTransparency = isSel and 0.2 or 0.5
+                            c2.TextColor3 = isSel and Color3.fromRGB(8, 8, 10) or C.text
+                        end
+                    end
+                    acUpdateStatusText()
+                end)
+            end
+        end
+    end
+end
+
+local function acSetSideDistance(val)
+    acSideDist = math.clamp(math.floor(val * 10 + 0.5) / 10, 0.0, 50.0)
+    local pct = math.clamp(acSideDist / 50.0, 0, 1)
+    acSideDistFill.Size = UDim2.new(pct, 0, 1, 0)
+    acSideDistHandle.Position = UDim2.new(pct, 0, 0.5, 0)
+    acSideBadge.Text = string.format("%.1f studs", acSideDist)
+    acUpdateStatusText()
+end
+
+local function acSetForwardDistance(val)
+    acForwardDist = math.clamp(math.floor(val * 10 + 0.5) / 10, 0.0, 50.0)
+    local pct = math.clamp(acForwardDist / 50.0, 0, 1)
+    acFwdDistFill.Size = UDim2.new(pct, 0, 1, 0)
+    acFwdDistHandle.Position = UDim2.new(pct, 0, 0.5, 0)
+    acFwdBadge.Text = string.format("%.1f studs", acForwardDist)
+    acUpdateStatusText()
+end
+
+acSetSideDistance(2.0)
+acSetForwardDistance(2.0)
+
+acSearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+    acUpdatePlayerList(acSearchBox.Text)
+end)
+Players.PlayerAdded:Connect(function() task.wait(0.1); acUpdatePlayerList(acSearchBox.Text) end)
+Players.PlayerRemoving:Connect(function() task.wait(0.1); acUpdatePlayerList(acSearchBox.Text) end)
+
+acSideDistTrack.InputBegan:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+        acSideDragging = true
+        local pct = math.clamp((inp.Position.X - acSideDistTrack.AbsolutePosition.X) / acSideDistTrack.AbsoluteSize.X, 0, 1)
+        acSetSideDistance(pct * 50)
+    end
+end)
+acFwdDistTrack.InputBegan:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+        acFwdDragging = true
+        local pct = math.clamp((inp.Position.X - acFwdDistTrack.AbsolutePosition.X) / acFwdDistTrack.AbsoluteSize.X, 0, 1)
+        acSetForwardDistance(pct * 50)
+    end
+end)
+UserInputService.InputEnded:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+        acSideDragging = false
+        acFwdDragging = false
+    end
+end)
+UserInputService.InputChanged:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch then
+        if acSideDragging then
+            local pct = math.clamp((inp.Position.X - acSideDistTrack.AbsolutePosition.X) / acSideDistTrack.AbsoluteSize.X, 0, 1)
+            acSetSideDistance(pct * 50)
+        elseif acFwdDragging then
+            local pct = math.clamp((inp.Position.X - acFwdDistTrack.AbsolutePosition.X) / acFwdDistTrack.AbsoluteSize.X, 0, 1)
+            acSetForwardDistance(pct * 50)
+        end
+    end
+end)
+
+local function acUpdateSideButtons()
+    local function setBtnActive(btn, active)
+        btn.BackgroundColor3 = active and C.accent or C.surface
+        btn.TextColor3 = active and Color3.fromRGB(8, 8, 10) or C.textDim
+    end
+    setBtnActive(acSideLeft, acSideMode == "Left")
+    setBtnActive(acSideRight, acSideMode == "Right")
+    setBtnActive(acSideFront, acForwardMode == "Front")
+    setBtnActive(acSideBack, acForwardMode == "Back")
+end
+
+acSideLeft.MouseButton1Click:Connect(function()
+    acSideMode = (acSideMode == "Left") and nil or "Left"
+    acUpdateSideButtons()
+    acUpdateStatusText()
+end)
+acSideRight.MouseButton1Click:Connect(function()
+    acSideMode = (acSideMode == "Right") and nil or "Right"
+    acUpdateSideButtons()
+    acUpdateStatusText()
+end)
+acSideFront.MouseButton1Click:Connect(function()
+    acForwardMode = (acForwardMode == "Front") and nil or "Front"
+    acUpdateSideButtons()
+    acUpdateStatusText()
+end)
+acSideBack.MouseButton1Click:Connect(function()
+    acForwardMode = (acForwardMode == "Back") and nil or "Back"
+    acUpdateSideButtons()
+    acUpdateStatusText()
+end)
+
+-- Copier Freeze / Unfreeze
+local function acFreezeClone(clone)
+    if not clone then return end
+    acSavedStates = {}
+    for _, part in ipairs(clone:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if not part:FindFirstAncestorOfClass("Accessory") then
+                acSavedStates[part] = {
+                    Anchored = part.Anchored,
+                    CanCollide = part.CanCollide,
+                }
+                part.Anchored = not acFreeRoam
+                part.CanCollide = false
+            end
+        end
+    end
+    local hum = clone:FindFirstChildOfClass("Humanoid")
+    if hum then
+        acSavedStates.Humanoid = {
+            WalkSpeed = hum.WalkSpeed,
+            JumpPower = hum.JumpPower,
+            AutoRotate = hum.AutoRotate,
+        }
+        if not acFreeRoam then
+            hum.WalkSpeed = 0
+            hum.JumpPower = 0
+            hum.AutoRotate = false
+        else
+            hum.AutoRotate = true
+            if hum.WalkSpeed <= 0 then hum.WalkSpeed = 16 end
+        end
+    end
+end
+
+local function acUnfreezeClone(clone)
+    if not clone then return end
+    for part, state in pairs(acSavedStates) do
+        if typeof(part) == "Instance" and part.Parent and part:IsA("BasePart") then
+            if state.Anchored ~= nil then pcall(function() part.Anchored = state.Anchored end) end
+            pcall(function() part.CanCollide = state.CanCollide end)
+        end
+    end
+    local hum = clone:FindFirstChildOfClass("Humanoid")
+    if hum and acSavedStates.Humanoid then
+        pcall(function() hum.WalkSpeed = acSavedStates.Humanoid.WalkSpeed end)
+        pcall(function() hum.JumpPower = acSavedStates.Humanoid.JumpPower end)
+        pcall(function() hum.AutoRotate = acSavedStates.Humanoid.AutoRotate end)
+    end
+    acSavedStates = {}
+end
+
+local r15ToR6Map = {
+    ["Torso"] = {"UpperTorso", "LowerTorso"},
+    ["Right Arm"] = {"RightUpperArm", "RightLowerArm", "RightHand"},
+    ["Left Arm"] = {"LeftUpperArm", "LeftLowerArm", "LeftHand"},
+    ["Right Leg"] = {"RightUpperLeg", "RightLowerLeg", "RightFoot"},
+    ["Left Leg"] = {"LeftUpperLeg", "LeftLowerLeg", "LeftFoot"},
+    ["UpperTorso"] = {"Torso"},
+    ["LowerTorso"] = {"Torso"},
+    ["RightUpperArm"] = {"Right Arm"},
+    ["LeftUpperArm"] = {"Left Arm"},
+    ["RightUpperLeg"] = {"Right Leg"},
+    ["LeftUpperLeg"] = {"Left Leg"},
+}
+
+local function getTargetPart(char, partName)
+    if not char then return nil end
+    local p = char:FindFirstChild(partName)
+    if p and p:IsA("BasePart") then return p end
+    local alts = r15ToR6Map[partName]
+    if alts then
+        for _, alt in ipairs(alts) do
+            local ap = char:FindFirstChild(alt)
+            if ap and ap:IsA("BasePart") then return ap end
+        end
+    end
+    return nil
+end
+
+local function acStartCopying()
+    if acConn then acConn:Disconnect(); acConn = nil end
+
+    local clone = api and api.get_clone and api.get_clone(lp)
+    acFreezeClone(clone)
+
+    local clonePartMap = {}
+    if clone then
+        for _, part in ipairs(clone:GetDescendants()) do
+            if part:IsA("BasePart") and not part:FindFirstAncestorOfClass("Accessory") then
+                clonePartMap[part.Name] = part
+            end
+        end
+    end
+
+    acConn = RunService.Stepped:Connect(function()
+        if not acEnabled or not acSelectedPlayer then return end
+        if not (api and api.is_reanimated and api.is_reanimated()) then return end
+
+        local cloneChar = api.get_clone(lp)
+        if not cloneChar then return end
+
+        local targetChar = acSelectedPlayer.Character
+        local targetHRP = targetChar and (targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso"))
+        if not targetHRP then return end
+
+        if acFreeRoam then
+            -- FreeRoam Mode: sync motor transforms
+            for _, d in ipairs(cloneChar:GetDescendants()) do
+                if d:IsA("Motor6D") and d.Part0 and d.Part1 then
+                    local tP0 = getTargetPart(targetChar, d.Part0.Name)
+                    local tP1 = getTargetPart(targetChar, d.Part1.Name)
+                    if tP0 and tP1 then
+                        local relCF = tP0.CFrame:Inverse() * tP1.CFrame
+                        pcall(function()
+                            d.Transform = d.C0:Inverse() * relCF * d.C1
+                        end)
+                    end
+                end
+            end
+        elseif acFreeze then
+            -- Freeze Mode: stay on spot, match rotation
+            if not acFrozenPos then
+                local myHRP = cloneChar:FindFirstChild("HumanoidRootPart") or cloneChar:FindFirstChild("Torso")
+                acFrozenPos = myHRP and myHRP.Position or targetHRP.Position
+            end
+            local rootCF = CFrame.new(acFrozenPos) * targetHRP.CFrame.Rotation
+            for _, tPart in ipairs(targetChar:GetDescendants()) do
+                if tPart:IsA("BasePart") and not tPart:FindFirstAncestorOfClass("Accessory") then
+                    local cPart = clonePartMap[tPart.Name] or cloneChar:FindFirstChild(tPart.Name)
+                    if cPart and cPart:IsA("BasePart") then
+                        local rel = targetHRP.CFrame:Inverse() * tPart.CFrame
+                        cPart.CFrame = rootCF * rel
+                    end
+                end
+            end
+        else
+            -- Follow Mode: offset from target
+            local rVec = targetHRP.CFrame.RightVector
+            local lVec = targetHRP.CFrame.LookVector
+            local sOff = Vector3.zero
+            if acSideMode == "Left" then sOff = -rVec * acSideDist
+            elseif acSideMode == "Right" then sOff = rVec * acSideDist end
+
+            local fOff = Vector3.zero
+            if acForwardMode == "Front" then fOff = lVec * acForwardDist
+            elseif acForwardMode == "Back" then fOff = -lVec * acForwardDist end
+
+            local rootCF = CFrame.new(targetHRP.Position + sOff + fOff) * targetHRP.CFrame.Rotation
+            for _, tPart in ipairs(targetChar:GetDescendants()) do
+                if tPart:IsA("BasePart") and not tPart:FindFirstAncestorOfClass("Accessory") then
+                    local cPart = clonePartMap[tPart.Name] or cloneChar:FindFirstChild(tPart.Name)
+                    if cPart and cPart:IsA("BasePart") then
+                        local rel = targetHRP.CFrame:Inverse() * tPart.CFrame
+                        cPart.CFrame = rootCF * rel
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function acStopCopying()
+    if acConn then acConn:Disconnect(); acConn = nil end
+    local clone = api and api.get_clone and api.get_clone(lp)
+    acUnfreezeClone(clone)
+    acFrozenPos = nil
+    acUpdateStatusText()
+end
+
+acMasterBtn.MouseButton1Click:Connect(function()
+    acEnabled = not acEnabled
+    updateEternityToggleVisual(acMasterTrack, acMasterKnob, acMasterGlow, acEnabled, true)
+    if acEnabled then
+        acStartCopying()
+    else
+        acStopCopying()
+    end
+    acUpdateStatusText()
+end)
+
+acFreezeBtn.MouseButton1Click:Connect(function()
+    acFreeze = not acFreeze
+    if acFreeze and acFreeRoam then
+        acFreeRoam = false
+        updateEternityToggleVisual(acFreeRoamTrack, acFreeRoamKnob, acFreeRoamGlow, false, true)
+    end
+    updateEternityToggleVisual(acFreezeTrack, acFreezeKnob, acFreezeGlow, acFreeze, true)
+    if not acFreeze then acFrozenPos = nil end
+    if acEnabled then acStartCopying() end
+    acUpdateStatusText()
+end)
+
+acFreeRoamBtn.MouseButton1Click:Connect(function()
+    acFreeRoam = not acFreeRoam
+    if acFreeRoam and acFreeze then
+        acFreeze = false
+        acFrozenPos = nil
+        updateEternityToggleVisual(acFreezeTrack, acFreezeKnob, acFreezeGlow, false, true)
+    end
+    updateEternityToggleVisual(acFreeRoamTrack, acFreeRoamKnob, acFreeRoamGlow, acFreeRoam, true)
+    if acEnabled then acStartCopying() end
+    acUpdateStatusText()
+end)
+
+task.defer(function()
+    acUpdatePlayerList("")
+    acUpdateSideButtons()
+    acUpdateStatusText()
+end)
+
+
+-- ═══════════════════════════════════════════════════
+-- PANEL 7: TRACKING TAB (Head, Arms & Torso Cam - NO FAKE VR)
+-- ═══════════════════════════════════════════════════
+local trackingPanel = Instance.new("ScrollingFrame")
+trackingPanel.Size = UDim2.new(1, 0, 1, 0)
+trackingPanel.BackgroundTransparency = 1
+trackingPanel.BorderSizePixel = 0
+trackingPanel.ScrollBarThickness = 3
+trackingPanel.ScrollBarImageColor3 = C.accent
+trackingPanel.ScrollBarImageTransparency = 0.6
+pcall(function() trackingPanel.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
+trackingPanel.CanvasSize = UDim2.new(0, 0, 0, 400)
+trackingPanel.Visible = false
+trackingPanel.Parent = contentArea
+
+local trackingPadding = Instance.new("UIPadding", trackingPanel)
+trackingPadding.PaddingLeft = UDim.new(0, 2)
+trackingPadding.PaddingRight = UDim.new(0, 4)
+trackingPadding.PaddingTop = UDim.new(0, 2)
+trackingPadding.PaddingBottom = UDim.new(0, 14)
+
+local trackingLayout = Instance.new("UIListLayout", trackingPanel)
+trackingLayout.Padding = UDim.new(0, 8)
+trackingLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local trackingHeader = Instance.new("TextLabel", trackingPanel)
+trackingHeader.Size = UDim2.new(1, 0, 0, 16)
+trackingHeader.BackgroundTransparency = 1
+trackingHeader.Text = "HEAD & LIMB TRACKING"
+trackingHeader.TextColor3 = C.textMuted
+trackingHeader.Font = Enum.Font.GothamBold
+trackingHeader.TextSize = 10
+trackingHeader.TextXAlignment = Enum.TextXAlignment.Left
+trackingHeader.LayoutOrder = 1
+
+-- Tracking Global States
+_G._HaloHeadTrackerEnabled = false
+_G._HaloLeftArmPointerEnabled = false
+_G._HaloRightArmPointerEnabled = false
+_G._HaloLimbsTorsoCamControl = false
+_G._HaloLimbsTorsoCamMode = "Follow Camera"
+
+-- State tracking forward declaration
+local updateTrackingEngineState
+
+-- Card 1: Torso Camera Control
+local tccCard = Instance.new("Frame", trackingPanel)
+tccCard.Size = UDim2.new(1, 0, 0, 72)
+tccCard.BackgroundColor3 = C.bgCard
+tccCard.LayoutOrder = 2
+applyCorner(tccCard, 8)
+applyStroke(tccCard, C.divider, 1, 0)
+
+local tccTitle = Instance.new("TextLabel", tccCard)
+tccTitle.Size = UDim2.new(1, -70, 0, 16)
+tccTitle.Position = UDim2.new(0, 12, 0, 6)
+tccTitle.BackgroundTransparency = 1
+tccTitle.Text = "Torso Camera Control"
+tccTitle.TextColor3 = C.text
+tccTitle.Font = Enum.Font.GothamBold
+tccTitle.TextSize = 10.5
+tccTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local tccSub = Instance.new("TextLabel", tccCard)
+tccSub.Size = UDim2.new(1, -70, 0, 14)
+tccSub.Position = UDim2.new(0, 12, 0, 22)
+tccSub.BackgroundTransparency = 1
+tccSub.Text = "Lean and turn body with camera look direction"
+tccSub.TextColor3 = C.textMuted
+tccSub.Font = Enum.Font.GothamMedium
+tccSub.TextSize = 8.5
+tccSub.TextXAlignment = Enum.TextXAlignment.Left
+
+local tccTrack, tccKnob, tccGlow = createEternityToggleSwitch(tccCard, -54, -20)
+local tccBtn = Instance.new("TextButton", tccTrack)
+tccBtn.Size = UDim2.new(1, 0, 1, 0)
+tccBtn.BackgroundTransparency = 1
+tccBtn.Text = ""
+
+-- Mode Row for Torso Cam
+local tccModeRow = Instance.new("Frame", tccCard)
+tccModeRow.Position = UDim2.new(0, 10, 0, 42)
+tccModeRow.Size = UDim2.new(1, -20, 0, 22)
+tccModeRow.BackgroundTransparency = 1
+
+local tccModes = { "Follow Camera", "Pitch Only", "Locked" }
+local tccModeButtons = {}
+for idx, mName in ipairs(tccModes) do
+    local mBtn = Instance.new("TextButton", tccModeRow)
+    mBtn.Size = UDim2.new(0.315, 0, 1, 0)
+    mBtn.Position = UDim2.new((idx - 1) * 0.342, 0, 0, 0)
+    mBtn.BackgroundColor3 = (mName == _G._HaloLimbsTorsoCamMode) and C.accent or C.surface
+    mBtn.Text = mName
+    mBtn.TextColor3 = (mName == _G._HaloLimbsTorsoCamMode) and Color3.fromRGB(8, 8, 10) or C.textDim
+    mBtn.Font = Enum.Font.GothamBold
+    mBtn.TextSize = 8.5
+    applyCorner(mBtn, 4)
+    tccModeButtons[mName] = mBtn
+
+    mBtn.MouseButton1Click:Connect(function()
+        _G._HaloLimbsTorsoCamMode = mName
+        for k, b in pairs(tccModeButtons) do
+            local isAct = (k == mName)
+            b.BackgroundColor3 = isAct and C.accent or C.surface
+            b.TextColor3 = isAct and Color3.fromRGB(8, 8, 10) or C.textDim
+        end
+    end)
+end
+
+tccBtn.MouseButton1Click:Connect(function()
+    _G._HaloLimbsTorsoCamControl = not _G._HaloLimbsTorsoCamControl
+    updateEternityToggleVisual(tccTrack, tccKnob, tccGlow, _G._HaloLimbsTorsoCamControl, true)
+    updateTrackingEngineState()
+end)
+
+-- Helper: Keybindable Toggle Card for Tracking
+local currentlyBindingTracking = nil
+local function createTrackingToggleCard(title, subtitle, bindKeyName, onToggleChanged, layoutOrder)
+    local card = Instance.new("Frame", trackingPanel)
+    card.Size = UDim2.new(1, 0, 0, 46)
+    card.BackgroundColor3 = C.bgCard
+    card.LayoutOrder = layoutOrder
+    applyCorner(card, 8)
+    applyStroke(card, C.divider, 1, 0)
+
+    local tLbl = Instance.new("TextLabel", card)
+    tLbl.Size = UDim2.new(1, -125, 0, 16)
+    tLbl.Position = UDim2.new(0, 12, 0, 6)
+    tLbl.BackgroundTransparency = 1
+    tLbl.Text = title
+    tLbl.TextColor3 = C.text
+    tLbl.Font = Enum.Font.GothamBold
+    tLbl.TextSize = 10.5
+    tLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local sLbl = Instance.new("TextLabel", card)
+    sLbl.Size = UDim2.new(1, -125, 0, 14)
+    sLbl.Position = UDim2.new(0, 12, 0, 24)
+    sLbl.BackgroundTransparency = 1
+    sLbl.Text = subtitle
+    sLbl.TextColor3 = C.textMuted
+    sLbl.Font = Enum.Font.GothamMedium
+    sLbl.TextSize = 8.5
+    sLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Keybind Button
+    local curKey = savedConfig.trackingBinds[bindKeyName]
+    local bindBtn = Instance.new("TextButton", card)
+    bindBtn.Size = UDim2.new(0, 48, 0, 22)
+    bindBtn.Position = UDim2.new(1, -112, 0.5, -11)
+    bindBtn.BackgroundColor3 = C.surface
+    bindBtn.Text = curKey and ("[" .. curKey .. "]") or "[None]"
+    bindBtn.TextColor3 = curKey and C.accent or C.textMuted
+    bindBtn.Font = Enum.Font.GothamBold
+    bindBtn.TextSize = 8.5
+    applyCorner(bindBtn, 6)
+    applyStroke(bindBtn, C.border, 1, 0.3)
+
+    bindBtn.MouseButton1Click:Connect(function()
+        if currentlyBindingTracking == bindKeyName then
+            currentlyBindingTracking = nil
+            local k = savedConfig.trackingBinds[bindKeyName]
+            bindBtn.Text = k and ("[" .. k .. "]") or "[None]"
+            bindBtn.TextColor3 = k and C.accent or C.textMuted
+        else
+            currentlyBindingTracking = bindKeyName
+            bindBtn.Text = "[...]"
+            bindBtn.TextColor3 = Color3.fromRGB(255, 200, 80)
+        end
+    end)
+
+    local track, knob, glow = createEternityToggleSwitch(card, -54, -11)
+    local btn = Instance.new("TextButton", track)
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+
+    local isToggled = false
+    btn.MouseButton1Click:Connect(function()
+        isToggled = not isToggled
+        updateEternityToggleVisual(track, knob, glow, isToggled, true)
+        onToggleChanged(isToggled)
+        updateTrackingEngineState()
+    end)
+
+    return {
+        setToggled = function(val)
+            isToggled = val
+            updateEternityToggleVisual(track, knob, glow, isToggled, true)
+            onToggleChanged(isToggled)
+            updateTrackingEngineState()
+        end,
+        updateKeyUI = function()
+            local k = savedConfig.trackingBinds[bindKeyName]
+            bindBtn.Text = k and ("[" .. k .. "]") or "[None]"
+            bindBtn.TextColor3 = k and C.accent or C.textMuted
+        end
+    }
+end
+
+-- Card 2: Head Tracker
+local htCardUI = createTrackingToggleCard("Head Tracker", "Head turns realistically toward camera", "HeadTracker", function(state)
+    _G._HaloHeadTrackerEnabled = state
+end, 3)
+
+-- Card 3: Left Arm Pointer
+local laCardUI = createTrackingToggleCard("Left Arm Pointer", "Left arm aims straight at mouse cursor", "LeftArm", function(state)
+    _G._HaloLeftArmPointerEnabled = state
+end, 4)
+
+-- Card 4: Right Arm Pointer
+local raCardUI = createTrackingToggleCard("Right Arm Pointer", "Right arm aims straight at mouse cursor", "RightArm", function(state)
+    _G._HaloRightArmPointerEnabled = state
+end, 5)
+
+
+-- ═══════════════════════════════════════════════════
+-- PANEL 8: STRETCHING TAB (Torso, Legs & Arms)
+-- ═══════════════════════════════════════════════════
+local stretchingPanel = Instance.new("ScrollingFrame")
+stretchingPanel.Size = UDim2.new(1, 0, 1, 0)
+stretchingPanel.BackgroundTransparency = 1
+stretchingPanel.BorderSizePixel = 0
+stretchingPanel.ScrollBarThickness = 3
+stretchingPanel.ScrollBarImageColor3 = C.accent
+stretchingPanel.ScrollBarImageTransparency = 0.6
+pcall(function() stretchingPanel.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
+stretchingPanel.CanvasSize = UDim2.new(0, 0, 0, 360)
+stretchingPanel.Visible = false
+stretchingPanel.Parent = contentArea
+
+local stretchingPadding = Instance.new("UIPadding", stretchingPanel)
+stretchingPadding.PaddingLeft = UDim.new(0, 2)
+stretchingPadding.PaddingRight = UDim.new(0, 4)
+stretchingPadding.PaddingTop = UDim.new(0, 2)
+stretchingPadding.PaddingBottom = UDim.new(0, 14)
+
+local stretchingLayout = Instance.new("UIListLayout", stretchingPanel)
+stretchingLayout.Padding = UDim.new(0, 8)
+stretchingLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local stretchingHeader = Instance.new("TextLabel", stretchingPanel)
+stretchingHeader.Size = UDim2.new(1, 0, 0, 16)
+stretchingHeader.BackgroundTransparency = 1
+stretchingHeader.Text = "LIMB & TORSO STRETCHING"
+stretchingHeader.TextColor3 = C.textMuted
+stretchingHeader.Font = Enum.Font.GothamBold
+stretchingHeader.TextSize = 10
+stretchingHeader.TextXAlignment = Enum.TextXAlignment.Left
+stretchingHeader.LayoutOrder = 1
+
+-- Stretching States
+_G._HaloTorsoStretcherEnabled = false
+_G._HaloLegStretcherEnabled = false
+_G._HaloLeftArmStretching = false
+_G._HaloRightArmStretching = false
+_G._HaloLimbsUpperTorsoHeight = 1.0
+_G._HaloLimbsLegHeight = 1.0
+_G._HaloArmStretchAmount = 2.5
+
+-- Helper: Create Slider Card for Stretching
+local function createStretchSliderCard(title, subtitle, defaultVal, minVal, maxVal, unitStr, onToggleChanged, onValChanged, layoutOrder)
+    local card = Instance.new("Frame", stretchingPanel)
+    card.Size = UDim2.new(1, 0, 0, 72)
+    card.BackgroundColor3 = C.bgCard
+    card.LayoutOrder = layoutOrder
+    applyCorner(card, 8)
+    applyStroke(card, C.divider, 1, 0)
+
+    local tLbl = Instance.new("TextLabel", card)
+    tLbl.Size = UDim2.new(1, -70, 0, 16)
+    tLbl.Position = UDim2.new(0, 12, 0, 6)
+    tLbl.BackgroundTransparency = 1
+    tLbl.Text = title
+    tLbl.TextColor3 = C.text
+    tLbl.Font = Enum.Font.GothamBold
+    tLbl.TextSize = 10.5
+    tLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local sLbl = Instance.new("TextLabel", card)
+    sLbl.Size = UDim2.new(1, -70, 0, 14)
+    sLbl.Position = UDim2.new(0, 12, 0, 22)
+    sLbl.BackgroundTransparency = 1
+    sLbl.Text = subtitle
+    sLbl.TextColor3 = C.textMuted
+    sLbl.Font = Enum.Font.GothamMedium
+    sLbl.TextSize = 8.5
+    sLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local badge = Instance.new("TextLabel", card)
+    badge.Size = UDim2.new(0, 64, 0, 16)
+    badge.Position = UDim2.new(1, -128, 0, 6)
+    badge.BackgroundColor3 = C.surface
+    badge.Text = string.format("%.1f%s", defaultVal, unitStr)
+    badge.TextColor3 = C.accent
+    badge.Font = Enum.Font.GothamBold
+    badge.TextSize = 8.5
+    applyCorner(badge, 4)
+    applyStroke(badge, C.divider, 1, 0)
+
+    local track, knob, glow = createEternityToggleSwitch(card, -54, -20)
+    local btn = Instance.new("TextButton", track)
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+
+    local sliderTrack = Instance.new("Frame", card)
+    sliderTrack.Position = UDim2.new(0, 12, 0, 48)
+    sliderTrack.Size = UDim2.new(1, -24, 0, 6)
+    sliderTrack.BackgroundColor3 = C.surface
+    applyCorner(sliderTrack, 3)
+
+    local initPct = math.clamp((defaultVal - minVal) / (maxVal - minVal), 0, 1)
+    local sliderFill = Instance.new("Frame", sliderTrack)
+    sliderFill.Size = UDim2.new(initPct, 0, 1, 0)
+    sliderFill.BackgroundColor3 = C.accent
+    applyCorner(sliderFill, 3)
+
+    local sliderHandle = Instance.new("Frame", sliderTrack)
+    sliderHandle.AnchorPoint = Vector2.new(0.5, 0.5)
+    sliderHandle.Position = UDim2.new(initPct, 0, 0.5, 0)
+    sliderHandle.Size = UDim2.new(0, 12, 0, 12)
+    sliderHandle.BackgroundColor3 = C.text
+    applyCorner(sliderHandle, 6)
+
+    local isEnabled = false
+    btn.MouseButton1Click:Connect(function()
+        isEnabled = not isEnabled
+        updateEternityToggleVisual(track, knob, glow, isEnabled, true)
+        onToggleChanged(isEnabled)
+        updateTrackingEngineState()
+    end)
+
+    local dragging = false
+    local function setValFromPct(pct)
+        local val = minVal + pct * (maxVal - minVal)
+        val = math.floor(val * 10 + 0.5) / 10
+        pct = math.clamp((val - minVal) / (maxVal - minVal), 0, 1)
+        sliderFill.Size = UDim2.new(pct, 0, 1, 0)
+        sliderHandle.Position = UDim2.new(pct, 0, 0.5, 0)
+        badge.Text = string.format("%.1f%s", val, unitStr)
+        onValChanged(val)
+    end
+
+    sliderTrack.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            local pct = math.clamp((inp.Position.X - sliderTrack.AbsolutePosition.X) / sliderTrack.AbsoluteSize.X, 0, 1)
+            setValFromPct(pct)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(inp)
+        if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
+            local pct = math.clamp((inp.Position.X - sliderTrack.AbsolutePosition.X) / sliderTrack.AbsoluteSize.X, 0, 1)
+            setValFromPct(pct)
+        end
+    end)
+end
+
+-- Card 1: Torso Stretcher
+createStretchSliderCard("Torso Stretcher", "Scales UpperTorso height along spine", 1.0, 0.4, 25.0, "x", function(state)
+    _G._HaloTorsoStretcherEnabled = state
+end, function(v)
+    _G._HaloLimbsUpperTorsoHeight = v
+end, 2)
+
+-- Card 2: Leg Stretcher
+createStretchSliderCard("Leg Stretcher", "Scales leg length and adjusts HipHeight", 1.0, 0.4, 25.0, "x", function(state)
+    _G._HaloLegStretcherEnabled = state
+end, function(v)
+    _G._HaloLimbsLegHeight = v
+end, 3)
+
+-- Card 3: Arm Stretch
+createStretchSliderCard("Arm Stretch", "Scales arm bone length toward aim direction", 2.5, 0.5, 50.0, "x", function(state)
+    _G._HaloLeftArmStretching = state
+    _G._HaloRightArmStretching = state
+end, function(v)
+    _G._HaloArmStretchAmount = v
+end, 4)
+
+
+-- ═══════════════════════════════════════════════════
+-- TRACKING & STRETCHING RUNTIME ENGINE (Stepped Loop)
+-- ═══════════════════════════════════════════════════
+local trackingConn = nil
+local headSmoothedCF = nil
+local torsoCamSmoothedCF = nil
+
+updateTrackingEngineState = function()
+    local needsEngine = _G._HaloHeadTrackerEnabled
+        or _G._HaloLeftArmPointerEnabled
+        or _G._HaloRightArmPointerEnabled
+        or _G._HaloLimbsTorsoCamControl
+        or _G._HaloTorsoStretcherEnabled
+        or _G._HaloLegStretcherEnabled
+        or _G._HaloLeftArmStretching
+        or _G._HaloRightArmStretching
+
+    if not needsEngine then
+        if trackingConn then trackingConn:Disconnect(); trackingConn = nil end
+        headSmoothedCF = nil
+        torsoCamSmoothedCF = nil
+        return
+    end
+
+    if trackingConn then return end
+
+    trackingConn = RunService.Stepped:Connect(function()
+        if not (api and api.is_reanimated and api.is_reanimated()) then return end
+        local clone = api.get_clone(lp)
+        if not clone then return end
+
+        local camera = workspace.CurrentCamera
+        local mouse = lp:GetMouse()
+
+        -- 1. Head Tracker: Realistic smooth neck tracking (clamped yaw 75°, pitch 55°)
+        if _G._HaloHeadTrackerEnabled and camera then
+            local neck = nil
+            for _, d in ipairs(clone:GetDescendants()) do
+                if d:IsA("Motor6D") and (d.Name == "Neck" or d.Part1 and d.Part1.Name == "Head") then
+                    neck = d
+                    break
+                end
+            end
+            if neck and neck.Part0 then
+                local parentCF = neck.Part0.CFrame * neck.C0
+                local camLook = camera.CFrame.LookVector
+                local localLook = parentCF.Rotation:Inverse() * camLook
+                local yaw = math.clamp(math.atan2(localLook.X, -localLook.Z), -math.rad(75), math.rad(75))
+                local pitch = math.clamp(math.asin(math.clamp(localLook.Y, -1, 1)), -math.rad(55), math.rad(55))
+                local targetDir = Vector3.new(math.sin(yaw) * math.cos(pitch), math.sin(pitch), -math.cos(yaw) * math.cos(pitch)).Unit
+                local bindDir = Vector3.new(0, 0, -1)
+                local rotAxis = bindDir:Cross(targetDir)
+                local targetCF = CFrame.new()
+                if rotAxis.Magnitude > 0.001 then
+                    local angle = math.acos(math.clamp(bindDir:Dot(targetDir), -1, 1))
+                    targetCF = CFrame.fromAxisAngle(rotAxis.Unit, angle)
+                end
+                headSmoothedCF = headSmoothedCF and headSmoothedCF:Lerp(targetCF, 0.18) or targetCF
+                neck.Transform = headSmoothedCF
+            end
+        end
+
+        -- 2. Arm Pointers: Left & Right aim straight at 3D mouse cursor
+        if (_G._HaloLeftArmPointerEnabled or _G._HaloRightArmPointerEnabled) and camera and mouse then
+            local ray = camera:ViewportPointToRay(mouse.X, mouse.Y)
+            local params = RaycastParams.new()
+            params.FilterType = Enum.RaycastFilterType.Exclude
+            local filterList = { clone }
+            local real = api.get_real_character and api.get_real_character(lp)
+            if real then table.insert(filterList, real) end
+            params.FilterDescendantsInstances = filterList
+            local hit = workspace:Raycast(ray.Origin, ray.Direction * 1000, params)
+            local targetPos = hit and hit.Position or (ray.Origin + ray.Direction * 1000)
+
+            local function pointArm(shoulderName, elbowName, wristName, stretchMult)
+                local shoulder = nil
+                for _, d in ipairs(clone:GetDescendants()) do
+                    if d:IsA("Motor6D") and (d.Name == shoulderName or (d.Part1 and d.Part1.Name == shoulderName)) then
+                        shoulder = d
+                        break
+                    end
+                end
+                if not shoulder or not shoulder.Part0 then return end
+
+                local shoulderPos = (shoulder.Part0.CFrame * shoulder.C0).Position
+                local aimDir = (targetPos - shoulderPos)
+                if aimDir.Magnitude <= 0.001 then return end
+                aimDir = aimDir.Unit
+
+                local localAim = (shoulder.Part0.CFrame * shoulder.C0).Rotation:Inverse() * aimDir
+                local bindDir = Vector3.new(0, -1, 0)
+                local rotAxis = bindDir:Cross(localAim)
+                local rotCF = CFrame.new()
+                if rotAxis.Magnitude > 0.001 then
+                    local angle = math.acos(math.clamp(bindDir:Dot(localAim), -1, 1))
+                    rotCF = CFrame.fromAxisAngle(rotAxis.Unit, angle)
+                end
+                shoulder.Transform = rotCF
+
+                local elbow = nil
+                for _, d in ipairs(clone:GetDescendants()) do
+                    if d:IsA("Motor6D") and (d.Name == elbowName or (d.Part1 and d.Part1.Name == elbowName)) then
+                        elbow = d
+                        break
+                    end
+                end
+                if elbow then
+                    if stretchMult and stretchMult > 1.0 then
+                        elbow.Transform = CFrame.new(0, -(stretchMult - 1.0) * 1.2, 0)
+                    else
+                        elbow.Transform = CFrame.new()
+                    end
+                end
+            end
+
+            local sAmt = _G._HaloArmStretchAmount or 2.5
+            if _G._HaloRightArmPointerEnabled then
+                local isStretching = _G._HaloRightArmStretching or false
+                pointArm("RightShoulder", "RightElbow", "RightWrist", isStretching and sAmt or 1.0)
+            end
+            if _G._HaloLeftArmPointerEnabled then
+                local isStretching = _G._HaloLeftArmStretching or false
+                pointArm("LeftShoulder", "LeftElbow", "LeftWrist", isStretching and sAmt or 1.0)
+            end
+        end
+
+        -- 3. Torso Camera Control & Torso Stretcher
+        local doTorso = _G._HaloTorsoStretcherEnabled or _G._HaloLimbsTorsoCamControl
+        if doTorso then
+            local waist = nil
+            for _, d in ipairs(clone:GetDescendants()) do
+                if d:IsA("Motor6D") and (d.Name == "Waist" or d.Name == "RootJoint") then
+                    waist = d
+                    break
+                end
+            end
+            if waist and waist.Part0 then
+                local baseRot = CFrame.new()
+                if _G._HaloLimbsTorsoCamControl and camera then
+                    local parentCF = waist.Part0.CFrame * waist.C0
+                    local camLook = camera.CFrame.LookVector
+                    local localLook = parentCF.Rotation:Inverse() * camLook
+                    local yaw = math.atan2(localLook.X, -localLook.Z)
+                    local pitch = math.asin(math.clamp(localLook.Y, -1, 1))
+                    local camRotCF = CFrame.new()
+                    local mode = _G._HaloLimbsTorsoCamMode
+                    if mode == "Locked" then
+                        yaw = math.clamp(yaw, -math.rad(45), math.rad(45))
+                        pitch = math.clamp(pitch, -math.rad(30), math.rad(30))
+                        camRotCF = CFrame.fromEulerAnglesYXZ(pitch, -yaw, 0)
+                    elseif mode == "Pitch Only" then
+                        camRotCF = CFrame.fromEulerAnglesYXZ(pitch, 0, 0)
+                    else
+                        camRotCF = CFrame.fromEulerAnglesYXZ(pitch * 2.0, -yaw, 0)
+                    end
+                    torsoCamSmoothedCF = torsoCamSmoothedCF and torsoCamSmoothedCF:Lerp(camRotCF, 0.2) or camRotCF
+                    baseRot = torsoCamSmoothedCF
+                end
+
+                local utH = _G._HaloLimbsUpperTorsoHeight or 1.0
+                local stretchY = _G._HaloTorsoStretcherEnabled and ((utH - 1.0) * 2.5) or 0
+                waist.Transform = CFrame.new(0, stretchY, 0) * baseRot
+            end
+        end
+
+        -- 4. Leg Stretcher
+        if _G._HaloLegStretcherEnabled then
+            local legScale = math.clamp(_G._HaloLimbsLegHeight or 1.0, 0.4, 25.0)
+            local rKnee, lKnee
+            for _, d in ipairs(clone:GetDescendants()) do
+                if d:IsA("Motor6D") then
+                    if d.Name == "RightKnee" or (d.Part1 and d.Part1.Name == "RightLowerLeg") then rKnee = d end
+                    if d.Name == "LeftKnee" or (d.Part1 and d.Part1.Name == "LeftLowerLeg") then lKnee = d end
+                end
+            end
+            if legScale ~= 1.0 then
+                local kneeOff = CFrame.new(0, -(legScale - 1.0) * 1.5, 0)
+                if rKnee then rKnee.Transform = kneeOff end
+                if lKnee then lKnee.Transform = kneeOff end
+            end
+            local hum = clone:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.HipHeight = 2.0 * legScale
+            end
+        end
+    end)
+end
+
+
+
+
+-- ═══════════════════════════════════════════════════
 -- 9. REANIMS & FAVS LIST ENGINE (Fast Virtualized)
 -- ═══════════════════════════════════════════════════
 local ROW_HEIGHT = 38
@@ -2127,16 +3448,22 @@ switchTab = function(tab)
     end
 
     local isAnimListTab = (tab == "Reanims" or tab == "Favs" or tab == "Custom")
-    listPanel.Visible   = isAnimListTab
-    bindsPanel.Visible  = (tab == "Binds")
-    speedPanel.Visible  = (tab == "Speed")
-    statesPanel.Visible = (tab == "States")
-    limbsPanel.Visible  = (tab == "Limbs")
+    listPanel.Visible       = isAnimListTab
+    bindsPanel.Visible      = (tab == "Binds")
+    speedPanel.Visible      = (tab == "Speed")
+    statesPanel.Visible     = (tab == "States")
+    copierPanel.Visible     = (tab == "Copier")
+    trackingPanel.Visible   = (tab == "Tracking")
+    stretchingPanel.Visible = (tab == "Stretching")
+    limbsPanel.Visible      = (tab == "Limbs")
 
     local activePanel = isAnimListTab and listPanel
         or (tab == "Binds" and bindsPanel)
         or (tab == "Speed" and speedPanel)
         or (tab == "States" and statesPanel)
+        or (tab == "Copier" and copierPanel)
+        or (tab == "Tracking" and trackingPanel)
+        or (tab == "Stretching" and stretchingPanel)
         or (tab == "Limbs" and limbsPanel)
 
     if activePanel then
@@ -2263,6 +3590,32 @@ UserInputService.InputBegan:Connect(function(input, gpe)
             applySpeed(tonumber(spdStr) or 1.0)
             return
         end
+    end
+
+    -- Check tracking keybind assignment
+    if currentlyBindingTracking then
+        local kName = input.KeyCode.Name
+        savedConfig.trackingBinds[currentlyBindingTracking] = kName
+        saveConfig()
+        if currentlyBindingTracking == "HeadTracker" and htCardUI then htCardUI.updateKeyUI()
+        elseif currentlyBindingTracking == "LeftArm" and laCardUI then laCardUI.updateKeyUI()
+        elseif currentlyBindingTracking == "RightArm" and raCardUI then raCardUI.updateKeyUI() end
+        currentlyBindingTracking = nil
+        return
+    end
+
+    -- Check tracking toggles via keybinds
+    if savedConfig.trackingBinds.HeadTracker and input.KeyCode.Name == savedConfig.trackingBinds.HeadTracker then
+        if htCardUI then htCardUI.setToggled(not _G._HaloHeadTrackerEnabled) end
+        return
+    end
+    if savedConfig.trackingBinds.LeftArm and input.KeyCode.Name == savedConfig.trackingBinds.LeftArm then
+        if laCardUI then laCardUI.setToggled(not _G._HaloLeftArmPointerEnabled) end
+        return
+    end
+    if savedConfig.trackingBinds.RightArm and input.KeyCode.Name == savedConfig.trackingBinds.RightArm then
+        if raCardUI then raCardUI.setToggled(not _G._HaloRightArmPointerEnabled) end
+        return
     end
 
     -- Check animation keybinds
