@@ -1161,7 +1161,7 @@ API.close_studio = function()
 	local CoreGui = game:GetService("CoreGui")
 	local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
 	if existing then
-		existing.Enabled = false
+		existing:Destroy()
 	end
 end;
 

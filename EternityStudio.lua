@@ -1734,54 +1734,13 @@ emptyTrackLabel.Parent = trackLane
 -- ==================================================================
 -- 7. SLEEK IN / OUT HUD TOGGLE SYSTEM & KEYBIND
 -- ==================================================================
+local lastToggleTime = 0
 toggleStudioHUD = function()
-    if isTweening then return end
-    isTweening = true
-    isHUDVisible = not isHUDVisible
+    local now = os.clock()
+    if now - lastToggleTime < 0.1 then return end
+    lastToggleTime = now
 
-    local ti = TweenInfo.new(0.34, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-
-    if isHUDVisible then
-        -- Animate panels back into view smoothly
-        floatingPill:TweenPosition(UDim2.new(0.5, 0, 0, -50), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.22, true, function()
-            floatingPill.Visible = false
-        end)
-
-        if not isLibCollapsed then
-            TweenService:Create(libraryPanel, ti, {Position = UDim2.new(0, 12, 0, 14)}):Play()
-        else
-            btnSlideExpandLib.Visible = true
-            TweenService:Create(btnSlideExpandLib, ti, {Position = UDim2.new(0, 2, 0.5, -27)}):Play()
-        end
-
-        if not isInspCollapsed then
-            TweenService:Create(inspectorFrame, ti, {Position = UDim2.new(1, -282, 0, 14)}):Play()
-        else
-            btnSlideExpandInsp.Visible = true
-            TweenService:Create(btnSlideExpandInsp, ti, {Position = UDim2.new(1, -22, 0.5, -27)}):Play()
-        end
-
-        TweenService:Create(timelineSection, ti, {Position = UDim2.new(0, 12, 1, -138)}):Play()
-
-        task.delay(0.35, function() isTweening = false end)
-    else
-        -- Animate panels completely off-screen (Cinema Viewport Mode)
-        TweenService:Create(libraryPanel, ti, {Position = UDim2.new(0, -290, 0, 14)}):Play()
-        TweenService:Create(inspectorFrame, ti, {Position = UDim2.new(1, 30, 0, 14)}):Play()
-        TweenService:Create(timelineSection, ti, {Position = UDim2.new(0, 12, 1, 160)}):Play()
-
-        if isLibCollapsed then
-            TweenService:Create(btnSlideExpandLib, ti, {Position = UDim2.new(0, -30, 0.5, -27)}):Play()
-        end
-        if isInspCollapsed then
-            TweenService:Create(btnSlideExpandInsp, ti, {Position = UDim2.new(1, 10, 0.5, -27)}):Play()
-        end
-
-        floatingPill.Visible = true
-        floatingPill:TweenPosition(UDim2.new(0.5, 0, 0, 14), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.34, true)
-
-        task.delay(0.35, function() isTweening = false end)
-    end
+    screenGui.Enabled = not screenGui.Enabled
 end
 
 -- Hook up yellow minimize dot and floating restore pill
@@ -1799,7 +1758,7 @@ UserInputService.InputBegan:Connect(function(input, gpe)
             if data and data.studioToggleKey then studioKey = data.studioToggleKey end
         end
     end)
-    if input.KeyCode.Name == studioKey or input.KeyCode == Enum.KeyCode.K then
+    if input.KeyCode.Name == studioKey or (studioKey == "K" and input.KeyCode == Enum.KeyCode.K) then
         toggleStudioHUD()
     end
 end)

@@ -3040,21 +3040,35 @@ local function buildStudioPanel(parent)
     applyCorner(statusBadge, 4)
     applyStroke(statusBadge, C.divider, 1, 0)
 
-    -- Launch / Toggle Button
+    -- Button 1: Launch / Toggle HUD
     local launchBtn = Instance.new("TextButton", masterCard)
-    launchBtn.Size = UDim2.new(0.68, -16, 0, 32)
-    launchBtn.Position = UDim2.new(0, 12, 0, 48)
+    launchBtn.Size = UDim2.new(0.44, -8, 0, 32)
+    launchBtn.Position = UDim2.new(0, 10, 0, 48)
     launchBtn.BackgroundColor3 = C.accent
-    launchBtn.Text = "LAUNCH ETERNITY STUDIO"
+    launchBtn.Text = "LAUNCH STUDIO"
     launchBtn.TextColor3 = Color3.fromRGB(8, 8, 10)
     launchBtn.Font = Enum.Font.GothamBold
-    launchBtn.TextSize = 9.5
+    launchBtn.TextSize = 9
     launchBtn.AutoButtonColor = false
     applyCorner(launchBtn, 6)
 
+    -- Button 2: Close Studio (Completely destroys the window)
+    local closeStudioBtn = Instance.new("TextButton", masterCard)
+    closeStudioBtn.Size = UDim2.new(0.34, -8, 0, 32)
+    closeStudioBtn.Position = UDim2.new(0.44, 6, 0, 48)
+    closeStudioBtn.BackgroundColor3 = Color3.fromRGB(35, 18, 22)
+    closeStudioBtn.Text = "CLOSE STUDIO"
+    closeStudioBtn.TextColor3 = Color3.fromRGB(255, 95, 95)
+    closeStudioBtn.Font = Enum.Font.GothamBold
+    closeStudioBtn.TextSize = 9
+    closeStudioBtn.AutoButtonColor = false
+    applyCorner(closeStudioBtn, 6)
+    applyStroke(closeStudioBtn, Color3.fromRGB(85, 30, 35), 1, 0)
+
+    -- Button 3: Reload / Re-inject
     local resetBtn = Instance.new("TextButton", masterCard)
-    resetBtn.Size = UDim2.new(0.32, -8, 0, 32)
-    resetBtn.Position = UDim2.new(0.68, 0, 0, 48)
+    resetBtn.Size = UDim2.new(0.22, -10, 0, 32)
+    resetBtn.Position = UDim2.new(0.78, 2, 0, 48)
     resetBtn.BackgroundColor3 = C.surface
     resetBtn.Text = "RELOAD"
     resetBtn.TextColor3 = C.textDim
@@ -3065,40 +3079,60 @@ local function buildStudioPanel(parent)
     applyStroke(resetBtn, C.divider, 1, 0)
 
     local function updateStatus()
-        local open = (api and api.is_studio_open and api.is_studio_open()) or (CoreGui:FindFirstChild("EternityStudioTimelineEditor") and CoreGui.EternityStudioTimelineEditor.Enabled)
-        if open then
+        local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+        local isLoaded = (existing ~= nil)
+        local isVisible = (isLoaded and existing.Enabled == true)
+
+        if isVisible then
             statusBadge.Text = "ACTIVE"
             statusBadge.TextColor3 = C.green
-            launchBtn.Text = "CLOSE STUDIO"
-            launchBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+            launchBtn.Text = "TOGGLE HUD"
+            launchBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
             launchBtn.TextColor3 = C.text
+            closeStudioBtn.Visible = true
+        elseif isLoaded and not existing.Enabled then
+            statusBadge.Text = "HIDDEN"
+            statusBadge.TextColor3 = Color3.fromRGB(240, 200, 80)
+            launchBtn.Text = "SHOW STUDIO"
+            launchBtn.BackgroundColor3 = C.accent
+            launchBtn.TextColor3 = Color3.fromRGB(8, 8, 10)
+            closeStudioBtn.Visible = true
         else
             statusBadge.Text = "CLOSED"
             statusBadge.TextColor3 = C.textMuted
-            launchBtn.Text = "LAUNCH ETERNITY STUDIO"
+            launchBtn.Text = "LAUNCH STUDIO"
             launchBtn.BackgroundColor3 = C.accent
             launchBtn.TextColor3 = Color3.fromRGB(8, 8, 10)
+            closeStudioBtn.Visible = false
         end
     end
 
     launchBtn.MouseButton1Click:Connect(function()
-        if api and api.toggle_studio then
-            api.toggle_studio()
+        local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+        if existing then
+            existing.Enabled = not existing.Enabled
         else
-            local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
-            if existing then
-                existing.Enabled = not existing.Enabled
-            else
-                pcall(function()
-                    if isfile and isfile("EternityStudio.lua") then
-                        loadstring(readfile("EternityStudio.lua"))()
-                    elseif isfile and isfile("EternityStudio") then
-                        loadstring(readfile("EternityStudio"))()
-                    else
-                        loadstring(game:HttpGet("https://raw.githubusercontent.com/hor1zencodes/idk/main/EternityStudio.lua"))()
-                    end
-                end)
-            end
+            pcall(function()
+                if isfile and isfile("EternityStudio.lua") then
+                    loadstring(readfile("EternityStudio.lua"))()
+                elseif isfile and isfile("EternityStudio") then
+                    loadstring(readfile("EternityStudio"))()
+                else
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/hor1zencodes/idk/main/EternityStudio.lua"))()
+                end
+            end)
+        end
+        task.wait(0.1)
+        updateStatus()
+    end)
+
+    closeStudioBtn.MouseButton1Click:Connect(function()
+        local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+        if existing then
+            existing:Destroy()
+        end
+        if api and api.close_studio then
+            api.close_studio()
         end
         task.wait(0.1)
         updateStatus()
@@ -4043,15 +4077,21 @@ UserInputService.InputBegan:Connect(function(input, gpe)
 
     -- Check studio visibility toggle keybind
     local studioKey = savedConfig.studioToggleKey or "K"
-    if input.KeyCode.Name == studioKey then
-        if api and api.toggle_studio then
-            api.toggle_studio()
-        else
-            local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
-            if existing then
-                existing.Enabled = not existing.Enabled
-            end
+    if input.KeyCode.Name == studioKey or (studioKey == "K" and input.KeyCode == Enum.KeyCode.K) then
+        local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+        if not existing then
+            -- If not loaded yet, launch studio
+            pcall(function()
+                if isfile and isfile("EternityStudio.lua") then
+                    loadstring(readfile("EternityStudio.lua"))()
+                elseif isfile and isfile("EternityStudio") then
+                    loadstring(readfile("EternityStudio"))()
+                else
+                    loadstring(game:HttpGet("https://raw.githubusercontent.com/hor1zencodes/idk/main/EternityStudio.lua"))()
+                end
+            end)
         end
+        -- If already loaded, EternityStudio.lua's own listener handles toggleStudioHUD cleanly without race
         return
     end
 
