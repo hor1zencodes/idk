@@ -131,7 +131,8 @@ local savedConfig = {
     speedBinds = {},
     customAnims = {},
     hiddenLimbs = {},
-    trackingBinds = {}
+    trackingBinds = {},
+    studioToggleKey = "K"
 }
 
 if isfile and readfile and isfile(CONFIG_FILE) then
@@ -146,10 +147,12 @@ if isfile and readfile and isfile(CONFIG_FILE) then
             if data.customAnims then savedConfig.customAnims = data.customAnims end
             if data.hiddenLimbs then savedConfig.hiddenLimbs = data.hiddenLimbs end
             if data.trackingBinds then savedConfig.trackingBinds = data.trackingBinds end
+            if data.studioToggleKey then savedConfig.studioToggleKey = data.studioToggleKey end
         end
     end)
 end
 savedConfig.trackingBinds = savedConfig.trackingBinds or {}
+savedConfig.studioToggleKey = savedConfig.studioToggleKey or "K" 
 
 _G.hiddenBodyParts = _G.hiddenBodyParts or {}
 if savedConfig.hiddenLimbs then
@@ -1794,6 +1797,8 @@ local copierPanel = nil
 local trackingPanel = nil
 local stretchingPanel = nil
 local studioPanel = nil
+local currentlyBindingStudio = false
+local updateStudioKeyUI = nil
 local currentlyBindingTracking = nil
 local htCardUI = nil
 local laCardUI = nil
@@ -2971,7 +2976,7 @@ local function buildStudioPanel(parent)
     panel.ScrollBarImageColor3 = C.accent
     panel.ScrollBarImageTransparency = 0.6
     pcall(function() panel.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
-    panel.CanvasSize = UDim2.new(0, 0, 0, 480)
+    panel.CanvasSize = UDim2.new(0, 0, 0, 780)
     panel.Visible = false
     panel.Parent = parent
 
@@ -3116,6 +3121,143 @@ local function buildStudioPanel(parent)
         updateStatus()
     end)
 
+    -- Card 2: Studio Visibility Keybind Card
+    local keybindCard = Instance.new("Frame", panel)
+    keybindCard.Size = UDim2.new(1, 0, 0, 50)
+    keybindCard.BackgroundColor3 = C.bgCard
+    keybindCard.LayoutOrder = 3
+    applyCorner(keybindCard, 8)
+    applyStroke(keybindCard, C.divider, 1, 0)
+
+    local kbIcon = Instance.new("TextLabel", keybindCard)
+    kbIcon.Size = UDim2.new(0, 36, 1, 0)
+    kbIcon.Position = UDim2.new(0, 6, 0, 0)
+    kbIcon.BackgroundTransparency = 1
+    kbIcon.Text = "⌨"
+    kbIcon.TextColor3 = C.accent
+    kbIcon.Font = Enum.Font.GothamBold
+    kbIcon.TextSize = 14
+
+    local kbTitle = Instance.new("TextLabel", keybindCard)
+    kbTitle.Size = UDim2.new(1, -125, 0, 16)
+    kbTitle.Position = UDim2.new(0, 42, 0, 8)
+    kbTitle.BackgroundTransparency = 1
+    kbTitle.Text = "Studio Visibility Keybind"
+    kbTitle.TextColor3 = C.text
+    kbTitle.Font = Enum.Font.GothamBold
+    kbTitle.TextSize = 10.5
+    kbTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+    local kbSub = Instance.new("TextLabel", keybindCard)
+    kbSub.Size = UDim2.new(1, -125, 0, 14)
+    kbSub.Position = UDim2.new(0, 42, 0, 26)
+    kbSub.BackgroundTransparency = 1
+    kbSub.Text = "Press in-game to toggle Studio HUD on / off"
+    kbSub.TextColor3 = C.textMuted
+    kbSub.Font = Enum.Font.GothamMedium
+    kbSub.TextSize = 8.5
+    kbSub.TextXAlignment = Enum.TextXAlignment.Left
+
+    local kbBtn = Instance.new("TextButton", keybindCard)
+    kbBtn.Size = UDim2.new(0, 54, 0, 24)
+    kbBtn.Position = UDim2.new(1, -66, 0.5, -12)
+    kbBtn.BackgroundColor3 = C.surface
+    local curK = savedConfig.studioToggleKey or "K"
+    kbBtn.Text = "[" .. curK .. "]"
+    kbBtn.TextColor3 = C.accent
+    kbBtn.Font = Enum.Font.GothamBold
+    kbBtn.TextSize = 9
+    applyCorner(kbBtn, 6)
+    applyStroke(kbBtn, C.border, 1, 0.3)
+
+    updateStudioKeyUI = function()
+        local k = savedConfig.studioToggleKey or "K"
+        kbBtn.Text = "[" .. k .. "]"
+        kbBtn.TextColor3 = C.accent
+    end
+
+    kbBtn.MouseButton1Click:Connect(function()
+        currentlyBindingStudio = not currentlyBindingStudio
+        if currentlyBindingStudio then
+            kbBtn.Text = "[...]"
+            kbBtn.TextColor3 = Color3.fromRGB(255, 200, 80)
+        else
+            updateStudioKeyUI()
+        end
+    end)
+
+    -- Section Header: Studio Shortcuts & Controls
+    local ctrlHeader = Instance.new("TextLabel", panel)
+    ctrlHeader.Size = UDim2.new(1, 0, 0, 16)
+    ctrlHeader.BackgroundTransparency = 1
+    ctrlHeader.Text = "KEYBOARD SHORTCUTS & CONTROLS"
+    ctrlHeader.TextColor3 = C.textMuted
+    ctrlHeader.Font = Enum.Font.GothamBold
+    ctrlHeader.TextSize = 9.5
+    ctrlHeader.TextXAlignment = Enum.TextXAlignment.Left
+    ctrlHeader.LayoutOrder = 4
+
+    -- Helper to create clean shortcut badge rows
+    local function createShortcutRow(keyLabel, title, desc, order)
+        local c = Instance.new("Frame", panel)
+        c.Size = UDim2.new(1, 0, 0, 44)
+        c.BackgroundColor3 = C.bgCard
+        c.LayoutOrder = order
+        applyCorner(c, 8)
+        applyStroke(c, C.divider, 1, 0)
+
+        local badge = Instance.new("TextLabel", c)
+        badge.Size = UDim2.new(0, 72, 0, 22)
+        badge.Position = UDim2.new(0, 10, 0.5, -11)
+        badge.BackgroundColor3 = C.surface
+        badge.Text = keyLabel
+        badge.TextColor3 = C.accent
+        badge.Font = Enum.Font.GothamBold
+        badge.TextSize = 9
+        applyCorner(badge, 4)
+        applyStroke(badge, C.border, 1, 0.2)
+
+        local t = Instance.new("TextLabel", c)
+        t.Size = UDim2.new(1, -94, 0, 16)
+        t.Position = UDim2.new(0, 90, 0, 6)
+        t.BackgroundTransparency = 1
+        t.Text = title
+        t.TextColor3 = C.text
+        t.Font = Enum.Font.GothamBold
+        t.TextSize = 10
+        t.TextXAlignment = Enum.TextXAlignment.Left
+
+        local d = Instance.new("TextLabel", c)
+        d.Size = UDim2.new(1, -94, 0, 14)
+        d.Position = UDim2.new(0, 90, 0, 22)
+        d.BackgroundTransparency = 1
+        d.Text = desc
+        d.TextColor3 = C.textMuted
+        d.Font = Enum.Font.GothamMedium
+        d.TextSize = 8.5
+        d.TextXAlignment = Enum.TextXAlignment.Left
+
+        return c
+    end
+
+    createShortcutRow("[ Space ]", "Play / Pause Sequencer", "Start or pause timeline playback in real-time", 5)
+    createShortcutRow("[ Drag Needle ]", "Real-Time Avatar Scrubbing", "Click & drag red playhead to pose avatar frame-by-frame", 6)
+    createShortcutRow("[ Drag Handles ]", "Trim Clip Start / End", "Drag left/right edge handles of any clip on the track", 7)
+    createShortcutRow("[ Ctrl + V ]", "Import Animation Code", "Paste custom raw animation keyframe tables directly into Studio", 8)
+    createShortcutRow("[ Scroll ]", "Timeline Zoom & Pan", "Scroll mouse wheel on timeline to zoom ruler in / out", 9)
+    createShortcutRow("[ Loop ]", "Loop Playback Mode", "Toggle seamless repeating sequence loop in transport bar", 10)
+
+    -- Section Header: Features
+    local featHeader = Instance.new("TextLabel", panel)
+    featHeader.Size = UDim2.new(1, 0, 0, 16)
+    featHeader.BackgroundTransparency = 1
+    featHeader.Text = "STUDIO CAPABILITIES"
+    featHeader.TextColor3 = C.textMuted
+    featHeader.Font = Enum.Font.GothamBold
+    featHeader.TextSize = 9.5
+    featHeader.TextXAlignment = Enum.TextXAlignment.Left
+    featHeader.LayoutOrder = 11
+
     local function createFeatureCard(title, desc, badgeTxt, iconTxt, order)
         local c = Instance.new("Frame", panel)
         c.Size = UDim2.new(1, 0, 0, 50)
@@ -3167,10 +3309,10 @@ local function buildStudioPanel(parent)
         return c
     end
 
-    createFeatureCard("Multi-Track Timeline Sequencer", "Drag, position, loop & re-time sequential animation clips", "Sequencer", ">", 3)
-    createFeatureCard("Real-Time Avatar Playhead Scrubbing", "Scrub time across tracks to view character pose frame-by-frame", "Pose Sync", "O", 4)
-    createFeatureCard("Precision Clip Trimming & Splitting", "Non-destructive in/out trimming with split point markers", "Trimmer", "/", 5)
-    createFeatureCard("One-Click Merge & Catalog Export", "Merge tracks to single Lua file; auto-saves into Custom tab", "Catalog", "+", 6)
+    createFeatureCard("Multi-Track Timeline Sequencer", "Drag, position, loop & re-time sequential animation clips", "Sequencer", ">", 12)
+    createFeatureCard("Real-Time Avatar Playhead Scrubbing", "Scrub time across tracks to view character pose frame-by-frame", "Pose Sync", "O", 13)
+    createFeatureCard("Precision Clip Trimming & Splitting", "Non-destructive in/out trimming with split point markers", "Trimmer", "/", 14)
+    createFeatureCard("One-Click Merge & Catalog Export", "Merge tracks to single Lua file; auto-saves into Custom tab", "Catalog", "+", 15)
 
     panel:GetPropertyChangedSignal("Visible"):Connect(function()
         if panel.Visible then
@@ -3887,6 +4029,30 @@ UserInputService.InputBegan:Connect(function(input, gpe)
             applySpeed(tonumber(spdStr) or 1.0)
             return
         end
+    end
+
+    -- Check studio keybind assignment
+    if currentlyBindingStudio then
+        local kName = input.KeyCode.Name
+        savedConfig.studioToggleKey = kName
+        saveConfig()
+        if updateStudioKeyUI then updateStudioKeyUI() end
+        currentlyBindingStudio = false
+        return
+    end
+
+    -- Check studio visibility toggle keybind
+    local studioKey = savedConfig.studioToggleKey or "K"
+    if input.KeyCode.Name == studioKey then
+        if api and api.toggle_studio then
+            api.toggle_studio()
+        else
+            local existing = CoreGui:FindFirstChild("EternityStudioTimelineEditor")
+            if existing then
+                existing.Enabled = not existing.Enabled
+            end
+        end
+        return
     end
 
     -- Check tracking keybind assignment

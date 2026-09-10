@@ -1788,10 +1788,18 @@ end
 minimizeBtn.MouseButton1Click:Connect(toggleStudioHUD)
 floatingPill.MouseButton1Click:Connect(toggleStudioHUD)
 
--- Global Toggle Keybind: K
+-- Global Toggle Keybind: K or custom from config
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe or UserInputService:GetFocusedTextBox() then return end
-    if input.KeyCode == Enum.KeyCode.K then
+    local studioKey = "K"
+    pcall(function()
+        local CONFIG_FILE = "ZenReanimConfig.json"
+        if isfile and isfile(CONFIG_FILE) then
+            local data = HttpService:JSONDecode(readfile(CONFIG_FILE))
+            if data and data.studioToggleKey then studioKey = data.studioToggleKey end
+        end
+    end)
+    if input.KeyCode.Name == studioKey or input.KeyCode == Enum.KeyCode.K then
         toggleStudioHUD()
     end
 end)
