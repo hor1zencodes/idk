@@ -130,7 +130,8 @@ local savedConfig = {
     speed = 1.0,
     speedBinds = {},
     customAnims = {},
-    hiddenLimbs = {}
+    hiddenLimbs = {},
+    trackingBinds = {}
 }
 
 if isfile and readfile and isfile(CONFIG_FILE) then
@@ -144,9 +145,11 @@ if isfile and readfile and isfile(CONFIG_FILE) then
             if data.speedBinds then savedConfig.speedBinds = data.speedBinds end
             if data.customAnims then savedConfig.customAnims = data.customAnims end
             if data.hiddenLimbs then savedConfig.hiddenLimbs = data.hiddenLimbs end
+            if data.trackingBinds then savedConfig.trackingBinds = data.trackingBinds end
         end
     end)
 end
+savedConfig.trackingBinds = savedConfig.trackingBinds or {}
 
 _G.hiddenBodyParts = _G.hiddenBodyParts or {}
 if savedConfig.hiddenLimbs then
@@ -2700,7 +2703,7 @@ local function buildTrackingPanel(parent)
         sLbl.TextXAlignment = Enum.TextXAlignment.Left
     
         -- Keybind Button
-        local curKey = savedConfig.trackingBinds[bindKeyName]
+        local curKey = savedConfig.trackingBinds and savedConfig.trackingBinds[bindKeyName]
         local bindBtn = Instance.new("TextButton", card)
         bindBtn.Size = UDim2.new(0, 48, 0, 22)
         bindBtn.Position = UDim2.new(1, -112, 0.5, -11)
@@ -2715,7 +2718,7 @@ local function buildTrackingPanel(parent)
         bindBtn.MouseButton1Click:Connect(function()
             if currentlyBindingTracking == bindKeyName then
                 currentlyBindingTracking = nil
-                local k = savedConfig.trackingBinds[bindKeyName]
+                local k = savedConfig.trackingBinds and savedConfig.trackingBinds[bindKeyName]
                 bindBtn.Text = k and ("[" .. k .. "]") or "[None]"
                 bindBtn.TextColor3 = k and C.accent or C.textMuted
             else
@@ -2747,7 +2750,7 @@ local function buildTrackingPanel(parent)
                 updateTrackingEngineState()
             end,
             updateKeyUI = function()
-                local k = savedConfig.trackingBinds[bindKeyName]
+                local k = savedConfig.trackingBinds and savedConfig.trackingBinds[bindKeyName]
                 bindBtn.Text = k and ("[" .. k .. "]") or "[None]"
                 bindBtn.TextColor3 = k and C.accent or C.textMuted
             end
@@ -3155,11 +3158,18 @@ local function initTrackingAndStretchingEngine()
 end
 
 
--- Initialize Panels & Engine
-initTrackingAndStretchingEngine()
-copierPanel = buildCopierPanel(contentArea)
-trackingPanel = buildTrackingPanel(contentArea)
-stretchingPanel = buildStretchingPanel(contentArea)
+-- Initialize Panels & Engine safely
+local ok1, err1 = pcall(function() initTrackingAndStretchingEngine() end)
+if not ok1 then warn("Zen Reanimations [Engine Error]: " .. tostring(err1)) end
+
+local ok2, err2 = pcall(function() copierPanel = buildCopierPanel(contentArea) end)
+if not ok2 then warn("Zen Reanimations [Copier Error]: " .. tostring(err2)) end
+
+local ok3, err3 = pcall(function() trackingPanel = buildTrackingPanel(contentArea) end)
+if not ok3 then warn("Zen Reanimations [Tracking Error]: " .. tostring(err3)) end
+
+local ok4, err4 = pcall(function() stretchingPanel = buildStretchingPanel(contentArea) end)
+if not ok4 then warn("Zen Reanimations [Stretching Error]: " .. tostring(err4)) end
 
 
 -- ═══════════════════════════════════════════════════
@@ -3510,9 +3520,9 @@ switchTab = function(tab)
     bindsPanel.Visible      = (tab == "Binds")
     speedPanel.Visible      = (tab == "Speed")
     statesPanel.Visible     = (tab == "States")
-    copierPanel.Visible     = (tab == "Copier")
-    trackingPanel.Visible   = (tab == "Tracking")
-    stretchingPanel.Visible = (tab == "Stretching")
+    if copierPanel then copierPanel.Visible = (tab == "Copier") end
+    if trackingPanel then trackingPanel.Visible = (tab == "Tracking") end
+    if stretchingPanel then stretchingPanel.Visible = (tab == "Stretching") end
     limbsPanel.Visible      = (tab == "Limbs")
 
     local activePanel = isAnimListTab and listPanel
@@ -3653,6 +3663,7 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     -- Check tracking keybind assignment
     if currentlyBindingTracking then
         local kName = input.KeyCode.Name
+        savedConfig.trackingBinds = savedConfig.trackingBinds or {}
         savedConfig.trackingBinds[currentlyBindingTracking] = kName
         saveConfig()
         if currentlyBindingTracking == "HeadTracker" and htCardUI then htCardUI.updateKeyUI()
@@ -3663,15 +3674,15 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 
     -- Check tracking toggles via keybinds
-    if savedConfig.trackingBinds.HeadTracker and input.KeyCode.Name == savedConfig.trackingBinds.HeadTracker then
+    if savedConfig.trackingBinds and savedConfig.trackingBinds.HeadTracker and input.KeyCode.Name == savedConfig.trackingBinds.HeadTracker then
         if htCardUI then htCardUI.setToggled(not _G._HaloHeadTrackerEnabled) end
         return
     end
-    if savedConfig.trackingBinds.LeftArm and input.KeyCode.Name == savedConfig.trackingBinds.LeftArm then
+    if savedConfig.trackingBinds and savedConfig.trackingBinds.LeftArm and input.KeyCode.Name == savedConfig.trackingBinds.LeftArm then
         if laCardUI then laCardUI.setToggled(not _G._HaloLeftArmPointerEnabled) end
         return
     end
-    if savedConfig.trackingBinds.RightArm and input.KeyCode.Name == savedConfig.trackingBinds.RightArm then
+    if savedConfig.trackingBinds and savedConfig.trackingBinds.RightArm and input.KeyCode.Name == savedConfig.trackingBinds.RightArm then
         if raCardUI then raCardUI.setToggled(not _G._HaloRightArmPointerEnabled) end
         return
     end
@@ -3732,4 +3743,5 @@ end)
 -- Initialize
 updateReanimButtonState()
 applySpeed(currentSpeed)
+switchTab("Reanims")
 populateList()
