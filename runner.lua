@@ -87,7 +87,7 @@ local anim_success, anim_data = pcall(function()
     if isfile and isfile("animations.json") then
         return readfile("animations.json")
     end
-    return game:HttpGet("https://raw.githubusercontent.com/horizen-rblx/reanimsource/main/animations.json")
+    return game:HttpGet("https://raw.githubusercontent.com/hor1zencodes/idk/main/animations.json")
 end)
 
 if anim_success and type(anim_data) == "string" then

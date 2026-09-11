@@ -421,7 +421,7 @@ local function loadCatalog()
         if isfile and isfile("animations.json") then
             return readfile("animations.json")
         end
-        return game:HttpGet("https://raw.githubusercontent.com/horizen-rblx/reanimsource/main/animations.json")
+        return game:HttpGet("https://raw.githubusercontent.com/hor1zencodes/idk/main/animations.json")
     end)
 
     if ok and type(rawJson) == "string" then
